@@ -1,4 +1,4 @@
-import { TemplateResult, html, css } from 'lit';
+import { css, html, TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators';
 import { ifDefined } from 'lit-html/directives/if-defined';
 import { styleMap } from 'lit-html/directives/style-map';
@@ -6,6 +6,7 @@ import { FormElement } from '../FormElement';
 import { Modax } from '../dialog/Modax';
 import { sanitize } from '../textinput/helpers';
 import { CharCount } from '../charcount/CharCount';
+import { CustomEventType } from '../interfaces';
 
 enum SpellCheckerMode {
   VIEW,
@@ -148,6 +149,26 @@ export class SpellCheckedTextInput extends FormElement {
         z-index: 100;
       }
 
+      .spell-correction .right {
+        bottom: unset;
+        left: unset;
+        top: 50%;
+        right: -6px;
+        transform: translateX(100%) translateY(-46%);
+      }
+
+      .spell-correction .left {
+        bottom: unset;
+        left: -6px;
+        top: 50%;
+        transform: translateX(-100%) translateY(-46%);
+      }
+
+      .spell-correction .bottom {
+        bottom: unset;
+        top: 18px;
+      }
+
       .spell-correction:hover .tooltip {
         display: flex;
       }
@@ -162,6 +183,27 @@ export class SpellCheckedTextInput extends FormElement {
         border-left: 1px solid var(--color-widget-border);
         border-bottom: 1px solid var(--color-widget-border);
         background: var(--color-widget-bg);
+      }
+
+      .spell-correction .right .tail {
+        bottom: unset;
+        left: -4px;
+        top: 50%;
+        transform: translateY(-50%) rotate(45deg);
+      }
+
+      .spell-correction .left .tail {
+        bottom: unset;
+        left: unset;
+        right: -4px;
+        top: 50%;
+        transform: translateY(-50%) rotate(-135deg);
+      }
+
+      .spell-correction .bottom .tail {
+        bottom: unset;
+        top: -4px;
+        transform: translateX(-50%) rotate(135deg);
       }
 
       .spell-correction .tooltip .suggestions {
@@ -395,6 +437,10 @@ export class SpellCheckedTextInput extends FormElement {
       .then((results: SpellCheckerResult[]) => {
         const pieces: SpellCheckerResultPiece[] = [];
         const resultsLength = results.length;
+        if (resultsLength === 0) {
+          this.checkingSpelling = false;
+          return;
+        }
         results
           .sort((a, b) => a.from - b.from)
           .reduce((offset, result, index) => {
@@ -418,6 +464,9 @@ export class SpellCheckedTextInput extends FormElement {
           this.renderSpellCheckResultPiece.bind(this)
         )}`;
         this.checkingSpelling = false;
+        this.fireCustomEvent(CustomEventType.SpellCorrectionsFound, {
+          results,
+        });
       })
       .catch(error => {
         console.error('Error checking spelling', error);

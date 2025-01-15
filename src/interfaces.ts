@@ -178,4 +178,5 @@ export enum CustomEventType {
   Submitted = 'temba-submitted',
   Redirected = 'temba-redirected',
   NoPath = 'temba-no-path',
+  SpellCorrectionsFound = 'temba-spell-corrections-found',
 }
