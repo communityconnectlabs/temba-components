@@ -1,4 +1,4 @@
-import { css, html, TemplateResult } from 'lit';
+import { css, html, render, TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators';
 import { ifDefined } from 'lit-html/directives/if-defined';
 import { styleMap } from 'lit-html/directives/style-map';
@@ -7,11 +7,6 @@ import { Modax } from '../dialog/Modax';
 import { sanitize } from '../textinput/helpers';
 import { CharCount } from '../charcount/CharCount';
 import { CustomEventType } from '../interfaces';
-
-enum SpellCheckerMode {
-  VIEW,
-  EDIT,
-}
 
 interface SpellCheckerResult {
   from: number;
@@ -73,21 +68,9 @@ export class SpellCheckedTextInput extends FormElement {
         background: var(--color-widget-bg-focused);
       }
 
-      .textarea-view {
-        min-height: 30px;
-      }
-
-      textarea,
-      .textarea-view {
-        height: var(--textarea-height);
-      }
-
-      .textinput,
-      .textinput-view {
-        padding: var(--temba-textinput-padding);
+      .textinput {
         border: none;
         flex: 1;
-        margin: 0;
         background: none;
         color: var(--color-widget-text);
         font-family: var(--font-family);
@@ -96,26 +79,46 @@ export class SpellCheckedTextInput extends FormElement {
         cursor: text;
         resize: none;
         font-weight: 300;
-        width: 100%;
+        width: calc(100% - (var(--temba-textinput-padding) * 2));
+        margin: var(--temba-textinput-padding);
+        padding: 0;
+        // make it behave like a normal input
+        display: inline-block;
+        white-space: nowrap;
+        overflow: hidden;
       }
 
-      .textinput:focus,
-      .textinput-view:focus {
+      .textinput:focus {
         outline: none;
         box-shadow: none;
         cursor: text;
       }
 
-      .textinput::placeholder,
-      .textinput-view::placeholder {
+      .textinput:empty:before {
+        content: attr(placeholder);
         color: var(--color-placeholder);
         font-weight: 300;
+      }
+
+      .textarea {
+        overflow-wrap: break-word;
+        height: var(--textarea-height);
+        max-height: var(--textarea-height, 30px);
+        overflow-y: auto;
+        min-height: 30px;
       }
 
       .grow-wrap {
         display: flex;
         align-items: stretch;
         width: 100%;
+      }
+
+      .grow-wrap .textarea {
+        display: unset;
+        white-space: unset;
+        overflow: unset;
+        max-height: unset;
       }
 
       .spell-correction {
@@ -222,12 +225,20 @@ export class SpellCheckedTextInput extends FormElement {
         font-weight: bold;
       }
 
+      .tooltip::after {
+        content: '';
+        position: absolute;
+        width: calc(100% + 16px);
+        height: calc(100% + 16px);
+        top: -8px;
+        left: -8px;
+        z-index: -1;
+        opacity: 0;
+      }
+
       .grow-wrap > div {
         border: 0px solid green;
-        width: 100%;
-        padding: var(--temba-textinput-padding);
         flex: 1;
-        margin: 0;
         background: none;
         color: var(--color-widget-text);
         font-family: var(--font-family);
@@ -236,13 +247,6 @@ export class SpellCheckedTextInput extends FormElement {
         cursor: text;
         resize: none;
         font-weight: 300;
-        width: 100%;
-        opacity: 0;
-      }
-
-      .grow-wrap textarea,
-      .grow-wrap .textarea-view {
-        margin-left: -100%;
       }
     `;
   }
@@ -293,13 +297,12 @@ export class SpellCheckedTextInput extends FormElement {
   @state()
   private spellCheckResults: TemplateResult;
 
-  @state()
-  spellCheckerMode = SpellCheckerMode.VIEW;
-
   counterElement: CharCount = null;
   cursorStart = -1;
   cursorEnd = -1;
   spellCheckerFunc: SpellCheckerFunc;
+  inputEventHandlers: any = {};
+  spellCheckerTimeout: any;
 
   public constructor() {
     super();
@@ -310,12 +313,19 @@ export class SpellCheckedTextInput extends FormElement {
         "No 'spellCheckerFunc' of type '(text: string) => Promise<SpellCheckerResult[]>' is found."
       );
     }
+
+    this.inputEventHandlers = {
+      input: this.handleInput.bind(this),
+      blur: this.handleBlur.bind(this),
+    };
   }
 
   public firstUpdated(changes: Map<string, any>) {
     super.firstUpdated(changes);
 
     this.inputElement = this.shadowRoot.querySelector('.textinput');
+    this.inputElement.addEventListener('input', this.inputEventHandlers.input);
+    this.inputElement.addEventListener('blur', this.inputEventHandlers.blur);
     this.doSpellCheck();
 
     if (changes.has('counter')) {
@@ -364,46 +374,25 @@ export class SpellCheckedTextInput extends FormElement {
 
     this.value = sanitized;
 
-    if (this.textarea) {
-      this.inputElement.value = this.value;
-    }
-
     if (this.counterElement) {
       this.counterElement.text = value;
     }
+
+    this.startSpellCheckTimeout();
   }
 
   private sanitizeGSM(text: string): string {
     return this.gsm ? sanitize(text) : text;
   }
 
-  private handleChange(update: any): void {
-    if (this.disabled) {
-      return;
-    }
-    this.updateValue(update.target.value);
-    this.fireEvent('change');
-  }
-
   private handleContainerClick(): void {
     if (this.disabled) {
       return;
     }
-    this.focusOnInputField();
-  }
-
-  private focusOnInputField() {
-    // Make the input field visible and focus on it
-    this.spellCheckerMode = SpellCheckerMode.EDIT;
-    setTimeout(() => {
-      this.inputElement = this.shadowRoot.querySelector('.textinput');
-      this.inputElement.focus();
-    }, 1);
+    this.inputElement.focus();
   }
 
   private handleBlur() {
-    // Hide the input field and show the text
-    this.spellCheckerMode = SpellCheckerMode.VIEW;
     this.doSpellCheck();
     this.blur();
   }
@@ -413,7 +402,7 @@ export class SpellCheckedTextInput extends FormElement {
       return;
     }
 
-    this.updateValue(update.target.value);
+    this.updateValue(update.target.innerText);
     this.setValues([this.value]);
     this.fireEvent('input');
   }
@@ -424,7 +413,11 @@ export class SpellCheckedTextInput extends FormElement {
   }
 
   public doSpellCheck(): void {
-    this.spellCheckResults = html`${this.renderText(this.value)}`;
+    if (!this.value) {
+      this.spellCheckResults = undefined;
+      return;
+    }
+
     if (!this.spellCheckerFunc) {
       this.spellCheckResults = html`${[{ text: this.value }].map(
         this.renderSpellCheckResultPiece.bind(this)
@@ -433,6 +426,9 @@ export class SpellCheckedTextInput extends FormElement {
     }
 
     this.checkingSpelling = true;
+    this.spellCheckResults = html`${this.renderText(this.value)}`;
+    this.renderInputContent();
+
     this.spellCheckerFunc(this.value)
       .then((results: SpellCheckerResult[]) => {
         const pieces: SpellCheckerResultPiece[] = [];
@@ -460,10 +456,11 @@ export class SpellCheckedTextInput extends FormElement {
             }
             return offset;
           }, 0);
+        this.checkingSpelling = false;
         this.spellCheckResults = html`${pieces.map(
           this.renderSpellCheckResultPiece.bind(this)
         )}`;
-        this.checkingSpelling = false;
+        this.renderInputContent();
         this.fireCustomEvent(CustomEventType.SpellCorrectionsFound, {
           results,
         });
@@ -474,41 +471,45 @@ export class SpellCheckedTextInput extends FormElement {
       });
   }
 
+  private startSpellCheckTimeout(): void {
+    if (this.spellCheckerTimeout) {
+      clearTimeout(this.spellCheckerTimeout);
+    }
+    this.spellCheckerTimeout = setTimeout(() => {
+      this.doSpellCheck();
+    }, 3000);
+  }
+
+  // @formatter:off
   private renderSpellCheckResultPiece(
     piece: SpellCheckerResultPiece
   ): TemplateResult {
     if (!piece.result) {
       return html`${this.renderText(piece.text)}`;
     }
-    return html`
-      <span class="spell-correction">
-        <div class="text">${this.renderText(piece.text)}</div>
-        <div class="tooltip">
-          <div class="message">${piece.result.message}</div>
-          <div class="suggestions">
-            ${piece.result.suggestions.map(
-              suggestion =>
-                html` <div
-                  @click="${evt => {
-                    evt.stopPropagation();
-                    evt.preventDefault();
-                    this.value =
-                      this.value.substring(0, piece.result.from) +
-                      suggestion +
-                      this.value.substring(piece.result.to);
-                    this.doSpellCheck();
-                  }}"
-                  class="suggestion"
-                >
-                  ${suggestion}
-                </div>`
-            )}
-          </div>
-          <div class="tail"></div>
-        </div>
-      </span>
-    `;
+
+    const onSuggestionClick = (suggestion: string) => {
+      return (evt: any) => {
+        evt.stopPropagation();
+        evt.preventDefault();
+        this.value =
+          this.value.substring(0, piece.result.from) +
+          suggestion +
+          this.value.substring(piece.result.to);
+        this.doSpellCheck();
+      };
+    };
+
+    const renderSuggestionButton = (suggestion: string) => {
+      const t = suggestion;
+      const c = onSuggestionClick(suggestion);
+      return html` <div @click="${c}" class="suggestion">${t}</div>`;
+    };
+
+    // prettier-ignore
+    return html`<span class="spell-correction"><div class="tooltip" contenteditable="false"><div class="message">${piece.result.message}</div><div class="suggestions">${piece.result.suggestions.map(renderSuggestionButton)}</div><div class="tail"></div></div><div class="text">${this.renderText(piece.text)}</div></span>`;
   }
+  // @formatter:on
 
   private renderText(text: string): TemplateResult {
     text = text.replace(/ /g, '&nbsp;'); // Replace spaces with &nbsp;
@@ -565,30 +566,35 @@ export class SpellCheckedTextInput extends FormElement {
     this.handleContainerClick();
   }
 
-  private renderInputFieldOrDisplayField(input: TemplateResult) {
-    if (this.spellCheckerMode === SpellCheckerMode.VIEW) {
-      input = html`
-        <p class="textinput-view" style="cursor: pointer;">
-          ${this.spellCheckResults}
-        </p>
-      `;
+  public renderInputContent(): void {
+    // Have issue when re-rendering content, using Lit template way,
+    // after it has been changed so have to do this trick to render manually
+    const parent = this.inputElement.parentElement;
+    const clone = this.inputElement.cloneNode(true) as HTMLInputElement;
 
-      if (this.textarea) {
-        input = html`
-          <p class="textinput-view textarea-view" style="cursor: pointer;">
-            ${this.spellCheckResults}
-          </p>
-        `;
-
-        if (this.autogrow) {
-          input = html` <div class="grow-wrap">
-            <div>${this.renderText(this.value)}</div>
-            ${input}
-          </div>`;
-        }
-      }
+    try {
+      // remove an old input element and add a new one with new rendered content
+      this.inputElement.removeEventListener(
+        'input',
+        this.inputEventHandlers.input
+      );
+      this.inputElement.removeEventListener(
+        'blur',
+        this.inputEventHandlers.blur
+      );
+      this.inputElement.remove();
+      clone.innerHTML = '';
+      render(this.spellCheckResults, clone);
+      parent.appendChild(clone);
+      this.inputElement = clone;
+      this.inputElement.addEventListener(
+        'input',
+        this.inputEventHandlers.input
+      );
+      this.inputElement.addEventListener('blur', this.inputEventHandlers.blur);
+    } catch (e) {
+      console.log(e);
     }
-    return input;
   }
 
   public render(): TemplateResult {
@@ -606,14 +612,12 @@ export class SpellCheckedTextInput extends FormElement {
         : null;
 
     let input: TemplateResult<any> = html`
-      <input
+      <div
         class="textinput"
+        contenteditable=${this.disabled ? 'false' : 'true'}
         name=${this.name}
         type="text"
         maxlength="${ifDefined(this.maxlength)}"
-        @change=${this.handleChange}
-        @input=${this.handleInput}
-        @blur=${this.handleBlur}
         @keydown=${(e: KeyboardEvent) => {
           if (e.key === 'Enter') {
             // eslint-disable-next-line @typescript-eslint/no-this-alias
@@ -663,34 +667,26 @@ export class SpellCheckedTextInput extends FormElement {
           }
         }}
         placeholder=${this.placeholder}
-        .value=${this.value}
         .disabled=${this.disabled}
-      />
+      ></div>
     `;
 
     if (this.textarea) {
       input = html`
-        <textarea
-          class="textinput"
+        <div
+          class="textinput textarea"
+          contenteditable=${this.disabled ? 'false' : 'true'}
           name=${this.name}
           placeholder=${this.placeholder}
-          @change=${this.handleChange}
-          @input=${this.handleInput}
-          @blur=${this.handleBlur}
-          .value=${this.value}
           .disabled=${this.disabled}
-        ></textarea>
+        ></div>
       `;
 
       if (this.autogrow) {
-        input = html` <div class="grow-wrap">
-          <div>${this.renderText(this.value)}</div>
-          ${input}
-        </div>`;
+        input = html` <div class="grow-wrap">${input}</div>`;
       }
     }
 
-    input = this.renderInputFieldOrDisplayField(input);
     const loading = this.checkingSpelling
       ? html` <div style="position: absolute; right: 10px; bottom: 5px">
           <temba-loading
