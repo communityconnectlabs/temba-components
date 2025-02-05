@@ -107,8 +107,8 @@ export class SpellCheckedTextInput extends FormElement {
         overflow-wrap: break-word;
         height: var(--textarea-height);
         max-height: var(--textarea-height, 30px);
-        overflow-y: auto;
         min-height: 30px;
+        white-space: unset;
       }
 
       .grow-wrap {
@@ -119,7 +119,6 @@ export class SpellCheckedTextInput extends FormElement {
 
       .grow-wrap .textarea {
         display: unset;
-        white-space: unset;
         overflow: unset;
         max-height: unset;
       }
@@ -150,11 +149,9 @@ export class SpellCheckedTextInput extends FormElement {
       display: flex;
       flex-direction: column;
       gap: 8px;
-      position: absolute;
-      bottom: 18px;
-      left: 50%;
+      position: fixed;
       min-width: 120px;
-      transform: translateX(-50%);
+      max-width: 200px;
       cursor: default;
 
       padding: 6px;
@@ -521,11 +518,42 @@ export class SpellCheckedTextInput extends FormElement {
     window.addEventListener('click', this.inputEventHandlers.destroyTooltips);
     document.querySelector('#spell-checker-tooltip')?.remove();
     document.body.appendChild(tooltip);
-    console.log(
-      'Spell correction clicked',
-      target.getClientRects(),
-      tooltip.getClientRects()
-    );
+
+    const cr = target.getClientRects()[0];
+    const tr = tooltip.getClientRects()[0];
+    const wr = document.body.getClientRects()[0];
+    if (!cr || !tr) {
+      return;
+    } else if (
+      cr.top > tr.height + 5 &&
+      cr.left + cr.width / 2 > tr.width / 2 + 5
+    ) {
+      const top = cr.top - tr.height - 5;
+      const left = cr.left + cr.width / 2 - tr.width / 2;
+      tooltip.style.top = `${top}px`;
+      tooltip.style.left = `${left}px`;
+    } else if (
+      cr.left + cr.width + tr.width + 10 < wr.width &&
+      cr.top - 10 > tr.height
+    ) {
+      const top = cr.top + cr.height / 2 - tr.height / 2 + 2;
+      const left = cr.left + cr.width + 10;
+      tooltip.style.top = `${top}px`;
+      tooltip.style.left = `${left}px`;
+      tooltip.classList.add('right');
+    } else if (cr.left + 10 > tr.width && cr.top - 10 > tr.height) {
+      const top = cr.top + cr.height / 2 - tr.height / 2 + 2;
+      const left = cr.left - tr.width - 10;
+      tooltip.style.top = `${top}px`;
+      tooltip.style.left = `${left}px`;
+      tooltip.classList.add('left');
+    } else {
+      const top = cr.top + cr.height + 10;
+      const left = cr.left + cr.width / 2 - tr.width / 2;
+      tooltip.style.top = `${top}px`;
+      tooltip.style.left = `${left}px`;
+      tooltip.classList.add('bottom');
+    }
   }
 
   private renderText(text: string): TemplateResult {
