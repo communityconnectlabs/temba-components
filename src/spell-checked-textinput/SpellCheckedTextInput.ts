@@ -20,7 +20,10 @@ interface SpellCheckerResultPiece {
   result?: SpellCheckerResult;
 }
 
-type SpellCheckerFunc = (text: string) => Promise<SpellCheckerResult[]>;
+type SpellCheckerFunc = (
+  text: string,
+  lang: string
+) => Promise<SpellCheckerResult[]>;
 
 export class SpellCheckedTextInput extends FormElement {
   static get styles() {
@@ -122,118 +125,9 @@ export class SpellCheckedTextInput extends FormElement {
       }
 
       .spell-correction {
-        position: relative;
-      }
-
-      .spell-correction .text {
         cursor: text;
         display: inline;
         text-decoration: var(--color-error) wavy underline;
-      }
-
-      .spell-correction .tooltip {
-        display: none;
-        flex-direction: column;
-        gap: 8px;
-        position: absolute;
-        bottom: 18px;
-        left: 50%;
-        min-width: 120px;
-        transform: translateX(-50%);
-        cursor: default;
-
-        color: white;
-        padding: 6px;
-        color: var(--color-widget-text);
-        background: var(--color-widget-bg);
-        border: 1px solid var(--color-widget-border);
-        border-radius: var(--curvature-widget);
-        box-shadow: var(--widget-box-shadow);
-        z-index: 100;
-      }
-
-      .spell-correction .right {
-        bottom: unset;
-        left: unset;
-        top: 50%;
-        right: -6px;
-        transform: translateX(100%) translateY(-46%);
-      }
-
-      .spell-correction .left {
-        bottom: unset;
-        left: -6px;
-        top: 50%;
-        transform: translateX(-100%) translateY(-46%);
-      }
-
-      .spell-correction .bottom {
-        bottom: unset;
-        top: 18px;
-      }
-
-      .spell-correction:hover .tooltip {
-        display: flex;
-      }
-
-      .spell-correction .tooltip .tail {
-        position: absolute;
-        bottom: -4px;
-        left: 50%;
-        transform: translateX(-50%) rotate(-45deg);
-        width: 5px;
-        height: 5px;
-        border-left: 1px solid var(--color-widget-border);
-        border-bottom: 1px solid var(--color-widget-border);
-        background: var(--color-widget-bg);
-      }
-
-      .spell-correction .right .tail {
-        bottom: unset;
-        left: -4px;
-        top: 50%;
-        transform: translateY(-50%) rotate(45deg);
-      }
-
-      .spell-correction .left .tail {
-        bottom: unset;
-        left: unset;
-        right: -4px;
-        top: 50%;
-        transform: translateY(-50%) rotate(-135deg);
-      }
-
-      .spell-correction .bottom .tail {
-        bottom: unset;
-        top: -4px;
-        transform: translateX(-50%) rotate(135deg);
-      }
-
-      .spell-correction .tooltip .suggestions {
-        display: flex;
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: 5px;
-      }
-
-      .spell-correction .tooltip .suggestion {
-        cursor: pointer;
-        text-decoration: var(--color-link-primary) underline;
-      }
-
-      .spell-correction .tooltip .suggestion:hover {
-        font-weight: bold;
-      }
-
-      .tooltip::after {
-        content: '';
-        position: absolute;
-        width: calc(100% + 16px);
-        height: calc(100% + 16px);
-        top: -8px;
-        left: -8px;
-        z-index: -1;
-        opacity: 0;
       }
 
       .grow-wrap > div {
@@ -250,6 +144,88 @@ export class SpellCheckedTextInput extends FormElement {
       }
     `;
   }
+
+  private tooltipCss = css`
+    .tooltip {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: absolute;
+      bottom: 18px;
+      left: 50%;
+      min-width: 120px;
+      transform: translateX(-50%);
+      cursor: default;
+
+      padding: 6px;
+      color: var(--color-widget-text);
+      background: var(--color-widget-bg);
+      border: 1px solid var(--color-widget-border);
+      border-radius: var(--curvature-widget);
+      box-shadow: var(--widget-box-shadow);
+      z-index: 100;
+    }
+
+    .tooltip::after {
+      content: '';
+      position: absolute;
+      width: calc(100% + 16px);
+      height: calc(100% + 16px);
+      top: -8px;
+      left: -8px;
+      z-index: -1;
+      opacity: 0;
+    }
+
+    .tooltip .suggestions {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .tooltip .suggestion {
+      cursor: pointer;
+      text-decoration: var(--color-link-primary) underline;
+    }
+
+    .tooltip .suggestion:hover {
+      font-weight: bold;
+    }
+
+    .tooltip .tail {
+      position: absolute;
+      bottom: -4px;
+      left: 50%;
+      transform: translateX(-50%) rotate(-45deg);
+      width: 5px;
+      height: 5px;
+      border-left: 1px solid var(--color-widget-border);
+      border-bottom: 1px solid var(--color-widget-border);
+      background: var(--color-widget-bg);
+    }
+
+    .right .tail {
+      bottom: unset;
+      left: -4px;
+      top: 50%;
+      transform: translateY(-50%) rotate(45deg);
+    }
+
+    .left .tail {
+      bottom: unset;
+      left: unset;
+      right: -4px;
+      top: 50%;
+      transform: translateY(-50%) rotate(-135deg);
+    }
+
+    .bottom .tail {
+      bottom: unset;
+      top: -4px;
+      transform: translateX(-50%) rotate(135deg);
+    }
+  `;
 
   @property({ type: Boolean })
   textarea: boolean;
@@ -317,6 +293,7 @@ export class SpellCheckedTextInput extends FormElement {
     this.inputEventHandlers = {
       input: this.handleInput.bind(this),
       blur: this.handleBlur.bind(this),
+      destroyTooltips: this.destroyTooltips.bind(this),
     };
   }
 
@@ -393,7 +370,7 @@ export class SpellCheckedTextInput extends FormElement {
   }
 
   private handleBlur() {
-    this.doSpellCheck();
+    this.startSpellCheckTimeout(250);
     this.blur();
   }
 
@@ -405,6 +382,10 @@ export class SpellCheckedTextInput extends FormElement {
     this.updateValue(update.target.innerText);
     this.setValues([this.value]);
     this.fireEvent('input');
+  }
+
+  private destroyTooltips() {
+    document.querySelector('#spell-checker-tooltip')?.remove();
   }
 
   /** we just return the value since it should be a string */
@@ -429,7 +410,7 @@ export class SpellCheckedTextInput extends FormElement {
     this.spellCheckResults = html`${this.renderText(this.value)}`;
     this.renderInputContent();
 
-    this.spellCheckerFunc(this.value)
+    this.spellCheckerFunc(this.value, this.lang)
       .then((results: SpellCheckerResult[]) => {
         const pieces: SpellCheckerResultPiece[] = [];
         const resultsLength = results.length;
@@ -471,45 +452,81 @@ export class SpellCheckedTextInput extends FormElement {
       });
   }
 
-  private startSpellCheckTimeout(): void {
+  private startSpellCheckTimeout(ms = 3000): void {
     if (this.spellCheckerTimeout) {
       clearTimeout(this.spellCheckerTimeout);
     }
     this.spellCheckerTimeout = setTimeout(() => {
       this.doSpellCheck();
-    }, 3000);
+    }, ms);
   }
 
   // @formatter:off
   private renderSpellCheckResultPiece(
-    piece: SpellCheckerResultPiece
+    piece: SpellCheckerResultPiece,
+    index: number
   ): TemplateResult {
     if (!piece.result) {
       return html`${this.renderText(piece.text)}`;
     }
 
-    const onSuggestionClick = (suggestion: string) => {
-      return (evt: any) => {
-        evt.stopPropagation();
-        evt.preventDefault();
-        this.value =
-          this.value.substring(0, piece.result.from) +
-          suggestion +
-          this.value.substring(piece.result.to);
-        this.doSpellCheck();
-      };
-    };
-
-    const renderSuggestionButton = (suggestion: string) => {
-      const t = suggestion;
-      const c = onSuggestionClick(suggestion);
-      return html` <div @click="${c}" class="suggestion">${t}</div>`;
-    };
-
     // prettier-ignore
-    return html`<span class="spell-correction"><div class="tooltip" contenteditable="false"><div class="message">${piece.result.message}</div><div class="suggestions">${piece.result.suggestions.map(renderSuggestionButton)}</div><div class="tail"></div></div><div class="text">${this.renderText(piece.text)}</div></span>`;
+    return html`<span class="spell-correction" data-index=${index} @click=${e => {e.preventDefault(); e.stopPropagation(); this.handleSpellCorrectionClick.bind(this)(index, piece)}}>${this.renderText(piece.text)}</span>`;
   }
   // @formatter:on
+
+  private handleSpellCorrectionClick(
+    index: number,
+    piece: SpellCheckerResultPiece
+  ): void {
+    const target = this.shadowRoot.querySelector(
+      `.spell-correction[data-index="${index}"]`
+    );
+    const tooltip = document.createElement('div');
+    const message = document.createElement('div');
+    const suggestions = document.createElement('div');
+    const tail = document.createElement('div');
+
+    tooltip.id = 'spell-checker-tooltip';
+    tooltip.classList.add('tooltip');
+    message.classList.add('message');
+    message.innerText = piece.result.message;
+    suggestions.classList.add('suggestions');
+    piece.result.suggestions.forEach(suggestion => {
+      const suggestionElement = document.createElement('div');
+      suggestionElement.innerText = suggestion;
+      suggestionElement.classList.add('suggestion');
+      suggestionElement.onclick = () => {
+        const before = this.value.substring(0, piece.result.from);
+        const after = this.value.substring(piece.result.to);
+        this.value = before + suggestion + after;
+        this.startSpellCheckTimeout(0);
+      };
+      suggestions.appendChild(suggestionElement);
+    });
+    tail.classList.add('tail');
+
+    tooltip.appendChild(message);
+    tooltip.appendChild(suggestions);
+    tooltip.appendChild(tail);
+
+    // tooltip.style.opacity = '0';
+    if (!document.querySelector('#spell-checker-tooltip-styles')) {
+      const style = document.createElement('style');
+      style.textContent = this.tooltipCss.cssText;
+      style.id = 'spell-checker-tooltip-styles';
+      document.head.appendChild(style);
+    }
+
+    window.addEventListener('click', this.inputEventHandlers.destroyTooltips);
+    document.querySelector('#spell-checker-tooltip')?.remove();
+    document.body.appendChild(tooltip);
+    console.log(
+      'Spell correction clicked',
+      target.getClientRects(),
+      tooltip.getClientRects()
+    );
+  }
 
   private renderText(text: string): TemplateResult {
     text = text.replace(/ /g, '&nbsp;'); // Replace spaces with &nbsp;
