@@ -145,7 +145,7 @@ export class SpellCheckedTextInput extends FormElement {
   }
 
   private tooltipCss = css`
-    .tooltip {
+    #spell-checker-tooltip {
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -160,10 +160,10 @@ export class SpellCheckedTextInput extends FormElement {
       border: 1px solid var(--color-widget-border);
       border-radius: var(--curvature-widget);
       box-shadow: var(--widget-box-shadow);
-      z-index: 100;
+      z-index: 10000;
     }
 
-    .tooltip::after {
+    #spell-checker-tooltip::after {
       content: '';
       position: absolute;
       width: calc(100% + 16px);
@@ -174,23 +174,23 @@ export class SpellCheckedTextInput extends FormElement {
       opacity: 0;
     }
 
-    .tooltip .suggestions {
+    #spell-checker-tooltip .suggestions {
       display: flex;
       flex-direction: row;
       flex-wrap: wrap;
       gap: 5px;
     }
 
-    .tooltip .suggestion {
+    #spell-checker-tooltip .suggestion {
       cursor: pointer;
       text-decoration: var(--color-link-primary) underline;
     }
 
-    .tooltip .suggestion:hover {
+    #spell-checker-tooltip .suggestion:hover {
       font-weight: bold;
     }
 
-    .tooltip .tail {
+    #spell-checker-tooltip .tail {
       position: absolute;
       bottom: -4px;
       left: 50%;
@@ -290,6 +290,7 @@ export class SpellCheckedTextInput extends FormElement {
     this.inputEventHandlers = {
       input: this.handleInput.bind(this),
       blur: this.handleBlur.bind(this),
+      keydown: this.handleKeyDown.bind(this),
       destroyTooltips: this.destroyTooltips.bind(this),
     };
   }
@@ -300,6 +301,13 @@ export class SpellCheckedTextInput extends FormElement {
     this.inputElement = this.shadowRoot.querySelector('.textinput');
     this.inputElement.addEventListener('input', this.inputEventHandlers.input);
     this.inputElement.addEventListener('blur', this.inputEventHandlers.blur);
+    if (!this.textarea) {
+      this.inputElement.addEventListener(
+        'keydown',
+        this.inputEventHandlers.keydown
+      );
+    }
+    this.inputElement.value = this.value;
     this.doSpellCheck();
 
     if (changes.has('counter')) {
@@ -338,6 +346,8 @@ export class SpellCheckedTextInput extends FormElement {
   private updateValue(value: string): void {
     const cursorStart = this.inputElement.selectionStart;
     const cursorEnd = this.inputElement.selectionEnd;
+
+    this.inputElement.value = value;
 
     const sanitized = this.sanitizeGSM(value);
 
@@ -379,6 +389,55 @@ export class SpellCheckedTextInput extends FormElement {
     this.updateValue(update.target.innerText);
     this.setValues([this.value]);
     this.fireEvent('input');
+  }
+
+  private handleKeyDown(e: KeyboardEvent): void {
+    if (e.key === 'Enter') {
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
+      const input = this;
+
+      if (this.submitOnEnter) {
+        const parentModax = input.getParentModax();
+        const parentForm = !parentModax ? input.getParentForm() : null;
+
+        this.value = this.values[0];
+        this.fireEvent('change');
+
+        // if we don't have something to submit then bail
+        if (!parentModax && !parentForm) {
+          return;
+        }
+
+        input.blur();
+
+        // look for a form to submit
+        window.setTimeout(function () {
+          // first, look for a modax that contains us
+          const modax = input.getParentModax();
+          if (modax) {
+            input.blur();
+
+            modax.submit();
+          } else {
+            // otherwise, just look for a vanilla submit button
+            const form = input.getParentForm();
+
+            if (form) {
+              const submitButton = form.querySelector(
+                "input[type='submit']"
+              ) as HTMLInputElement;
+              if (submitButton) {
+                submitButton.click();
+              } else {
+                form.submit();
+              }
+            }
+          }
+        }, 10);
+        // this is needed for firefox, would be nice to
+        // find a way to do this with a callback instead
+      }
+    }
   }
 
   private destroyTooltips() {
@@ -485,7 +544,6 @@ export class SpellCheckedTextInput extends FormElement {
     const tail = document.createElement('div');
 
     tooltip.id = 'spell-checker-tooltip';
-    tooltip.classList.add('tooltip');
     message.classList.add('message');
     message.innerText = piece.result.message;
     suggestions.classList.add('suggestions');
@@ -637,6 +695,13 @@ export class SpellCheckedTextInput extends FormElement {
         this.inputEventHandlers.input
       );
       this.inputElement.addEventListener('blur', this.inputEventHandlers.blur);
+      if (!this.textarea) {
+        this.inputElement.addEventListener(
+          'keydown',
+          this.inputEventHandlers.keydown
+        );
+      }
+      this.inputElement.value = this.value;
     } catch (e) {
       console.log(e);
     }
@@ -663,54 +728,6 @@ export class SpellCheckedTextInput extends FormElement {
         name=${this.name}
         type="text"
         maxlength="${ifDefined(this.maxlength)}"
-        @keydown=${(e: KeyboardEvent) => {
-          if (e.key === 'Enter') {
-            // eslint-disable-next-line @typescript-eslint/no-this-alias
-            const input = this;
-
-            if (this.submitOnEnter) {
-              const parentModax = input.getParentModax();
-              const parentForm = !parentModax ? input.getParentForm() : null;
-
-              this.value = this.values[0];
-              this.fireEvent('change');
-
-              // if we don't have something to submit then bail
-              if (!parentModax && !parentForm) {
-                return false;
-              }
-
-              input.blur();
-
-              // look for a form to submit
-              window.setTimeout(function () {
-                // first, look for a modax that contains us
-                const modax = input.getParentModax();
-                if (modax) {
-                  input.blur();
-
-                  modax.submit();
-                } else {
-                  // otherwise, just look for a vanilla submit button
-                  const form = input.getParentForm();
-
-                  if (form) {
-                    const submitButton = form.querySelector(
-                      "input[type='submit']"
-                    ) as HTMLInputElement;
-                    if (submitButton) {
-                      submitButton.click();
-                    } else {
-                      form.submit();
-                    }
-                  }
-                }
-              }, 10);
-              // this is needed for firefox, would be nice to
-              // find a way to do this with a callback instead
-            }
-          }
-        }}
         placeholder=${this.placeholder}
         .disabled=${this.disabled}
       ></div>
