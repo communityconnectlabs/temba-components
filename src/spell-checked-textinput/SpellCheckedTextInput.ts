@@ -299,9 +299,6 @@ export class SpellCheckedTextInput extends FormElement {
 
   public firstUpdated(changes: Map<string, any>) {
     super.firstUpdated(changes);
-    const shadowRoot = this.shadowRoot as any;
-    const selection = shadowRoot.getSelection();
-
     this.inputElement = this.shadowRoot.querySelector('.textinput');
     this.inputElement.addEventListener('input', this.inputEventHandlers.input);
     this.inputElement.addEventListener('blur', this.inputEventHandlers.blur);
@@ -314,8 +311,7 @@ export class SpellCheckedTextInput extends FormElement {
       );
     }
     this.inputElement.value = this.value;
-    this.inputElement.selectionStart = selection.focusOffset;
-    this.inputElement.selectionEnd = selection.anchorOffset;
+    this.onSelectionChange();
     this.doSpellCheck();
 
     if (changes.has('counter')) {
@@ -327,7 +323,9 @@ export class SpellCheckedTextInput extends FormElement {
         root = document;
       }
       this.counterElement = root.querySelector(this.counter);
-      this.counterElement.text = this.value;
+      if (this.counterElement) {
+        this.counterElement.text = this.value;
+      }
     }
   }
 
@@ -352,12 +350,8 @@ export class SpellCheckedTextInput extends FormElement {
   }
 
   private updateValue(value: string): void {
-    const shadowRoot = this.shadowRoot as any;
-    const selection = shadowRoot.getSelection();
-
     this.inputElement.value = value;
-    this.inputElement.selectionStart = selection.focusOffset;
-    this.inputElement.selectionEnd = selection.anchorOffset;
+    this.onSelectionChange();
 
     const cursorStart = this.inputElement.selectionStart;
     const cursorEnd = this.inputElement.selectionEnd;
@@ -460,22 +454,22 @@ export class SpellCheckedTextInput extends FormElement {
   private onSelectionChange() {
     const shadowRoot = this.shadowRoot as any;
     const selection = shadowRoot.getSelection();
+    let offset = 0;
 
-    this.inputElement.selectionStart = selection.focusOffset;
-    this.inputElement.selectionEnd = selection.anchorOffset;
-    console.log(
-      'selection changed',
-      selection.focusOffset,
-      selection.anchorOffset
-    );
+    if (selection.focusNode) {
+      offset = this.inputElement.innerText.search(
+        selection.focusNode.textContent
+      );
+    }
+
+    this.inputElement.selectionStart = offset + selection.focusOffset;
+    this.inputElement.selectionEnd = offset + selection.anchorOffset;
   }
 
   private setSelectionRange(startIndex: number, endIndex: number) {
     const shadowRoot = this.shadowRoot as any;
     const selection = shadowRoot.getSelection();
     const range = document.createRange();
-    this.inputElement.selectionStart = startIndex;
-    this.inputElement.selectionEnd = endIndex;
 
     const currentNode = this.inputElement;
     let charCount = 0;
@@ -498,7 +492,9 @@ export class SpellCheckedTextInput extends FormElement {
       return false;
     }
 
+    charCount = 0;
     findNode(currentNode, startIndex, false); // Set start position
+    charCount = 0;
     findNode(currentNode, endIndex, true); // Set end position
 
     selection.removeAllRanges();
@@ -787,7 +783,7 @@ export class SpellCheckedTextInput extends FormElement {
       this.inputElement.value = this.value;
       if (focused) {
         this.inputElement.focus();
-        this.inputElement.setSelectionRange(
+        this.setSelectionRange(
           this.inputElement.selectionStart,
           this.inputElement.selectionEnd
         );
