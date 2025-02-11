@@ -292,15 +292,21 @@ export class SpellCheckedTextInput extends FormElement {
       blur: this.handleBlur.bind(this),
       keydown: this.handleKeyDown.bind(this),
       destroyTooltips: this.destroyTooltips.bind(this),
+      selectionChange: this.onSelectionChange.bind(this),
+      setSelectionRange: this.setSelectionRange.bind(this),
     };
   }
 
   public firstUpdated(changes: Map<string, any>) {
     super.firstUpdated(changes);
+    const shadowRoot = this.shadowRoot as any;
+    const selection = shadowRoot.getSelection();
 
     this.inputElement = this.shadowRoot.querySelector('.textinput');
     this.inputElement.addEventListener('input', this.inputEventHandlers.input);
     this.inputElement.addEventListener('blur', this.inputEventHandlers.blur);
+    this.inputElement.setSelectionRange =
+      this.inputEventHandlers.setSelectionRange;
     if (!this.textarea) {
       this.inputElement.addEventListener(
         'keydown',
@@ -308,6 +314,8 @@ export class SpellCheckedTextInput extends FormElement {
       );
     }
     this.inputElement.value = this.value;
+    this.inputElement.selectionStart = selection.focusOffset;
+    this.inputElement.selectionEnd = selection.anchorOffset;
     this.doSpellCheck();
 
     if (changes.has('counter')) {
@@ -344,10 +352,15 @@ export class SpellCheckedTextInput extends FormElement {
   }
 
   private updateValue(value: string): void {
-    const cursorStart = this.inputElement.selectionStart;
-    const cursorEnd = this.inputElement.selectionEnd;
+    const shadowRoot = this.shadowRoot as any;
+    const selection = shadowRoot.getSelection();
 
     this.inputElement.value = value;
+    this.inputElement.selectionStart = selection.focusOffset;
+    this.inputElement.selectionEnd = selection.anchorOffset;
+
+    const cursorStart = this.inputElement.selectionStart;
+    const cursorEnd = this.inputElement.selectionEnd;
 
     const sanitized = this.sanitizeGSM(value);
 
@@ -444,6 +457,54 @@ export class SpellCheckedTextInput extends FormElement {
     document.querySelector('#spell-checker-tooltip')?.remove();
   }
 
+  private onSelectionChange() {
+    const shadowRoot = this.shadowRoot as any;
+    const selection = shadowRoot.getSelection();
+
+    this.inputElement.selectionStart = selection.focusOffset;
+    this.inputElement.selectionEnd = selection.anchorOffset;
+    console.log(
+      'selection changed',
+      selection.focusOffset,
+      selection.anchorOffset
+    );
+  }
+
+  private setSelectionRange(startIndex: number, endIndex: number) {
+    const shadowRoot = this.shadowRoot as any;
+    const selection = shadowRoot.getSelection();
+    const range = document.createRange();
+    this.inputElement.selectionStart = startIndex;
+    this.inputElement.selectionEnd = endIndex;
+
+    const currentNode = this.inputElement;
+    let charCount = 0;
+
+    function findNode(node: any, index: number, isEnd = false) {
+      for (const child of node.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+          const nextCharCount = charCount + child.length;
+
+          if (index <= nextCharCount) {
+            range[isEnd ? 'setEnd' : 'setStart'](child, index - charCount);
+            return true;
+          }
+
+          charCount = nextCharCount;
+        } else if (child.nodeType === Node.ELEMENT_NODE) {
+          if (findNode(child, index, isEnd)) return true;
+        }
+      }
+      return false;
+    }
+
+    findNode(currentNode, startIndex, false); // Set start position
+    findNode(currentNode, endIndex, true); // Set end position
+
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
   /** we just return the value since it should be a string */
   public serializeValue(value: any): string {
     return value;
@@ -509,6 +570,7 @@ export class SpellCheckedTextInput extends FormElement {
   }
 
   private startSpellCheckTimeout(ms = 3000): void {
+    this.onSelectionChange();
     if (this.spellCheckerTimeout) {
       clearTimeout(this.spellCheckerTimeout);
     }
@@ -555,6 +617,11 @@ export class SpellCheckedTextInput extends FormElement {
         const before = this.value.substring(0, piece.result.from);
         const after = this.value.substring(piece.result.to);
         this.value = before + suggestion + after;
+        this.inputElement.focus();
+        this.inputElement.setSelectionRange(
+          piece.result.from + suggestion.length,
+          piece.result.from + suggestion.length
+        );
         this.startSpellCheckTimeout(0);
       };
       suggestions.appendChild(suggestionElement);
@@ -672,8 +739,10 @@ export class SpellCheckedTextInput extends FormElement {
   public renderInputContent(): void {
     // Have issue when re-rendering content, using Lit template way,
     // after it has been changed so have to do this trick to render manually
+    const shadowRoot = this.shadowRoot as any;
     const parent = this.inputElement.parentElement;
     const clone = this.inputElement.cloneNode(true) as HTMLInputElement;
+    const focused = shadowRoot.activeElement === this.inputElement;
 
     try {
       // remove an old input element and add a new one with new rendered content
@@ -687,6 +756,16 @@ export class SpellCheckedTextInput extends FormElement {
       );
       this.inputElement.remove();
       clone.innerHTML = '';
+      clone.selectionStart = Math.min(
+        this.inputElement.selectionStart,
+        this.value.length
+      );
+      clone.selectionEnd = Math.min(
+        this.inputElement.selectionEnd,
+        this.value.length
+      );
+
+      clone.setSelectionRange = this.inputEventHandlers.setSelectionRange;
       render(this.spellCheckResults, clone);
       parent.appendChild(clone);
       this.inputElement = clone;
@@ -695,6 +774,10 @@ export class SpellCheckedTextInput extends FormElement {
         this.inputEventHandlers.input
       );
       this.inputElement.addEventListener('blur', this.inputEventHandlers.blur);
+      this.inputElement.addEventListener(
+        'selectionchange',
+        this.inputEventHandlers.selectionChange
+      );
       if (!this.textarea) {
         this.inputElement.addEventListener(
           'keydown',
@@ -702,6 +785,13 @@ export class SpellCheckedTextInput extends FormElement {
         );
       }
       this.inputElement.value = this.value;
+      if (focused) {
+        this.inputElement.focus();
+        this.inputElement.setSelectionRange(
+          this.inputElement.selectionStart,
+          this.inputElement.selectionEnd
+        );
+      }
     } catch (e) {
       console.log(e);
     }

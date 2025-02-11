@@ -133,7 +133,7 @@ export const getCompletions = (
   const parts = (dotQuery || '').split('.');
   let currentProps: CompletionProperty[] = session
     ? schema.root
-    : schema.root_no_session;
+    : schema?.root_no_session;
 
   if (!currentProps) {
     return [];
@@ -279,8 +279,14 @@ export const updateInputElementWithCompletion = (
     const caret = leftSide.length + insertText.length;
 
     // set our value and our new caret
-    ele.value = leftSide + insertText + remaining;
-    ele.setSelectionRange(caret, caret);
+    if (ele.tagName === 'DIV' && ele.classList.contains('textinput')) {
+      ele.innerText = leftSide + insertText + remaining;
+      ele.value = leftSide + insertText + remaining;
+      ele.setSelectionRange(caret, caret);
+    } else {
+      ele.value = leftSide + insertText + remaining;
+      ele.setSelectionRange(caret, caret);
+    }
 
     // now scroll our text box if necessary
     const position = getCursorXY(ele, caret);
