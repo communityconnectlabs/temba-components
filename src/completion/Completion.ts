@@ -175,6 +175,15 @@ export class Completion extends FormElement {
       this.session
     );
 
+    if (result.options.length && this.spellchecker) {
+      try {
+        (this.textInputElement as any).cancelSpellCheckTimeout();
+      } catch (e) {
+        // show error but don't break the rest of the code
+        console.error(e);
+      }
+    }
+
     this.query = result.query;
     this.options = result.options;
     this.anchorPosition = result.anchorPosition;

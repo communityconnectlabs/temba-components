@@ -302,14 +302,12 @@ export class SpellCheckedTextInput extends FormElement {
     this.inputElement = this.shadowRoot.querySelector('.textinput');
     this.inputElement.addEventListener('input', this.inputEventHandlers.input);
     this.inputElement.addEventListener('blur', this.inputEventHandlers.blur);
+    this.inputElement.addEventListener(
+      'keydown',
+      this.inputEventHandlers.keydown
+    );
     this.inputElement.setSelectionRange =
       this.inputEventHandlers.setSelectionRange;
-    if (!this.textarea) {
-      this.inputElement.addEventListener(
-        'keydown',
-        this.inputEventHandlers.keydown
-      );
-    }
     this.inputElement.value = this.value;
     this.onSelectionChange();
     this.doSpellCheck();
@@ -381,6 +379,7 @@ export class SpellCheckedTextInput extends FormElement {
       return;
     }
     this.inputElement.focus();
+    this.onSelectionChange();
   }
 
   private handleBlur() {
@@ -399,6 +398,11 @@ export class SpellCheckedTextInput extends FormElement {
   }
 
   private handleKeyDown(e: KeyboardEvent): void {
+    this.onSelectionChange();
+    if (!this.textarea) {
+      return;
+    }
+
     if (e.key === 'Enter') {
       // eslint-disable-next-line @typescript-eslint/no-this-alias
       const input = this;
@@ -457,7 +461,7 @@ export class SpellCheckedTextInput extends FormElement {
     let offset = 0;
 
     if (selection.focusNode) {
-      offset = this.inputElement.innerText.search(
+      offset = this.inputElement.innerText.indexOf(
         selection.focusNode.textContent
       );
     }
@@ -573,6 +577,12 @@ export class SpellCheckedTextInput extends FormElement {
     this.spellCheckerTimeout = setTimeout(() => {
       this.doSpellCheck();
     }, ms);
+  }
+
+  public cancelSpellCheckTimeout(): void {
+    if (this.spellCheckerTimeout) {
+      clearTimeout(this.spellCheckerTimeout);
+    }
   }
 
   // @formatter:off
@@ -774,12 +784,10 @@ export class SpellCheckedTextInput extends FormElement {
         'selectionchange',
         this.inputEventHandlers.selectionChange
       );
-      if (!this.textarea) {
-        this.inputElement.addEventListener(
-          'keydown',
-          this.inputEventHandlers.keydown
-        );
-      }
+      this.inputElement.addEventListener(
+        'keydown',
+        this.inputEventHandlers.keydown
+      );
       this.inputElement.value = this.value;
       if (focused) {
         this.inputElement.focus();

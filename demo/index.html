@@ -68,7 +68,7 @@
 </head>
 <body>
 <temba-store
-  completion="/static/api/completion.json"
+  completion="/static/api/editor.json"
   functions="/static/api/functions.json"
   fields="/static/api/fields.json"
   globals="/static/api/globals.json"
@@ -211,17 +211,16 @@
           });
         }
       </script>
-      <temba-spell-checked-textinput
+      <temba-completion
+        spellchecker
         name="spell-checker"
         label="Spell Checker"
         help_text="This is field will autocorrect your spelling"
         placeholder="Put something down, for real"
         value="I am a good sprller, with the additional text that overflows the input field width and should be wrapped and move to the next line"
-        spellCheckerFunc="spellCheck"
         textarea
         autogrow
-      >
-      </temba-spell-checked-textinput>
+      ></temba-completion>
     </div>
   </temba-tab>
 
