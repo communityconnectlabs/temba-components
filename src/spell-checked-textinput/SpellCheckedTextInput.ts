@@ -88,7 +88,7 @@ export class SpellCheckedTextInput extends FormElement {
         // make it behave like a normal input
         display: inline-block;
         white-space: nowrap;
-        overflow: hidden;
+        overflow: auto;
       }
 
       .textinput:focus {
@@ -140,6 +140,15 @@ export class SpellCheckedTextInput extends FormElement {
         cursor: text;
         resize: none;
         font-weight: 300;
+      }
+
+      /* Hide scrollbar */
+      .textinput {
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none; /* Internet Explorer/Edge */
+      }
+      .textinput::-webkit-scrollbar {
+        display: none; /* Chrome, Safari */
       }
     `;
   }
@@ -490,7 +499,11 @@ export class SpellCheckedTextInput extends FormElement {
 
           charCount = nextCharCount;
         } else if (child.nodeType === Node.ELEMENT_NODE) {
-          if (findNode(child, index, isEnd)) return true;
+          if (child.tagName === 'BR') {
+            charCount++;
+          } else if (findNode(child, index, isEnd)) {
+            return true;
+          }
         }
       }
       return false;
@@ -749,6 +762,8 @@ export class SpellCheckedTextInput extends FormElement {
     const parent = this.inputElement.parentElement;
     const clone = this.inputElement.cloneNode(true) as HTMLInputElement;
     const focused = shadowRoot.activeElement === this.inputElement;
+    const scrollTop = this.inputElement.scrollTop;
+    const scrollLeft = this.inputElement.scrollLeft;
 
     try {
       // remove an old input element and add a new one with new rendered content
@@ -795,6 +810,8 @@ export class SpellCheckedTextInput extends FormElement {
           this.inputElement.selectionStart,
           this.inputElement.selectionEnd
         );
+        this.inputElement.scrollTop = scrollTop;
+        this.inputElement.scrollLeft = scrollLeft;
       }
     } catch (e) {
       console.log(e);
