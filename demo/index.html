@@ -198,7 +198,8 @@
 
     <div class="example">
       <script type="application/javascript">
-        function spellCheckerFunc(text) {
+        function spellCheckerFunc(text, language) {
+          console.log(language);
           return new Promise((resolve) => {
             setTimeout(() => {
               resolve([{

@@ -266,6 +266,7 @@ export class Completion extends FormElement {
                 placeholder=${this.placeholder}
                 gsm=${this.gsm}
                 counter=${ifDefined(this.counter)}
+                lang=${this.lang}
                 @keyup=${this.handleKeyUp}
                 @click=${this.handleClick}
                 @input=${this.handleInput}
