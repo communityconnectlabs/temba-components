@@ -199,7 +199,6 @@
     <div class="example">
       <script type="application/javascript">
         function spellCheckerFunc(text, language) {
-          console.log(language);
           return new Promise((resolve) => {
             setTimeout(() => {
               resolve([{
@@ -218,9 +217,10 @@
         label="Spell Checker"
         help_text="This is field will autocorrect your spelling"
         placeholder="Put something down, for real"
-        value="I am a good sprller, with the additional text that overflows the input field width and should be wrapped and move to the next line<br><br>This is a new line"
+        value='A test feature the simple line that should overflow the container @(if(urns.discord, "A", contact.name))<br>Also<br>Need<br>To<br>Check<br>How<br>It<br>Overflows<br>Vertically<br>@(and(results))'
         textarea
         autogrow
+        style="--textarea-height: 180px;"
       ></temba-completion>
     </div>
   </temba-tab>

@@ -20,6 +20,12 @@ interface SpellCheckerResultPiece {
   result?: SpellCheckerResult;
 }
 
+interface FoundTextMatch {
+  start: number;
+  end: number;
+  text: string;
+}
+
 type SpellCheckerFunc = (
   text: string,
   lang: string
@@ -143,10 +149,12 @@ export class SpellCheckedTextInput extends FormElement {
       }
 
       /* Hide scrollbar */
+
       .textinput {
         scrollbar-width: none; /* Firefox */
         -ms-overflow-style: none; /* Internet Explorer/Edge */
       }
+
       .textinput::-webkit-scrollbar {
         display: none; /* Chrome, Safari */
       }
@@ -469,14 +477,71 @@ export class SpellCheckedTextInput extends FormElement {
     const selection = shadowRoot.getSelection();
     let offset = 0;
 
+    const findTextInFirstNotBlankSibling = (
+      node: Node,
+      prev = false
+    ): FoundTextMatch => {
+      let selectedNode = node as Element;
+      while (selectedNode) {
+        if (
+          selectedNode.tagName === 'DIV' &&
+          selectedNode.textContent.length > 0
+        ) {
+          selectedNode = (
+            prev ? selectedNode.lastChild : selectedNode.firstChild
+          ) as Element;
+          continue;
+        } else if (
+          selectedNode.nodeType === Node.TEXT_NODE &&
+          selectedNode.textContent.length > 0
+        ) {
+          const start = this.inputElement.innerText.indexOf(
+            selectedNode.textContent
+          );
+          const end = start + selectedNode.textContent.length;
+          return { start, end, text: selectedNode.textContent };
+        }
+        selectedNode = (
+          prev ? selectedNode.previousSibling : selectedNode.nextSibling
+        ) as Element;
+      }
+      return { start: -1, end: -1, text: '' }; // Not found
+    };
+
     if (selection.focusNode) {
-      offset = this.inputElement.innerText.indexOf(
-        selection.focusNode.textContent
+      const focusedString = selection.focusNode.textContent;
+      const prevMatch = findTextInFirstNotBlankSibling(
+        selection.focusNode.previousSibling,
+        true
       );
+      const nextMatch = findTextInFirstNotBlankSibling(
+        selection.focusNode.tagName === 'DIV'
+          ? selection.focusNode.firstChild
+          : selection.focusNode.nextSibling
+      );
+
+      offset = this.inputElement.innerText.indexOf(
+        focusedString,
+        prevMatch.end
+      );
+      if (prevMatch.start === -1 && offset && offset === -1) {
+        // can't find the current cursor position so keep it as it is.
+        return;
+      }
+      offset =
+        offset !== -1
+          ? offset
+          : nextMatch.start !== -1
+          ? nextMatch.start - 1
+          : prevMatch.end;
     }
 
-    this.inputElement.selectionStart = offset + selection.focusOffset;
-    this.inputElement.selectionEnd = offset + selection.anchorOffset;
+    const [startOffset, endOffset] = [
+      selection.focusOffset,
+      selection.anchorOffset,
+    ].sort((a, b) => a - b);
+    this.inputElement.selectionStart = offset + startOffset;
+    this.inputElement.selectionEnd = offset + endOffset;
   }
 
   private setSelectionRange(startIndex: number, endIndex: number) {
@@ -500,6 +565,10 @@ export class SpellCheckedTextInput extends FormElement {
           charCount = nextCharCount;
         } else if (child.nodeType === Node.ELEMENT_NODE) {
           if (child.tagName === 'BR') {
+            if (index == charCount) {
+              range[isEnd ? 'setEnd' : 'setStart'](child, 0);
+              return true;
+            }
             charCount++;
           } else if (findNode(child, index, isEnd)) {
             return true;
