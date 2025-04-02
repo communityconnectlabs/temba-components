@@ -68,7 +68,7 @@
 </head>
 <body>
 <temba-store
-  completion="/static/api/completion.json"
+  completion="/static/api/editor.json"
   functions="/static/api/functions.json"
   fields="/static/api/fields.json"
   globals="/static/api/globals.json"
@@ -198,7 +198,7 @@
 
     <div class="example">
       <script type="application/javascript">
-        function spellCheckerFunc(text) {
+        function spellCheckerFunc(text, language) {
           return new Promise((resolve) => {
             setTimeout(() => {
               resolve([{
@@ -211,17 +211,17 @@
           });
         }
       </script>
-      <temba-spell-checked-textinput
+      <temba-completion
+        spellchecker
         name="spell-checker"
         label="Spell Checker"
         help_text="This is field will autocorrect your spelling"
         placeholder="Put something down, for real"
-        value="I am a good sprller"
-        spellCheckerFunc="spellCheck"
+        value='A test feature the simple line that should overflow the container @(if(urns.discord, "A", contact.name))<br>Also<br>Need<br>To<br>Check<br>How<br>It<br>Overflows<br>Vertically<br>@(and(results))'
         textarea
         autogrow
-      >
-      </temba-spell-checked-textinput>
+        style="--textarea-height: 180px;"
+      ></temba-completion>
     </div>
   </temba-tab>
 

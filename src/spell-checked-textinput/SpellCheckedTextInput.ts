@@ -1,4 +1,4 @@
-import { css, html, TemplateResult } from 'lit';
+import { css, html, render, TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators';
 import { ifDefined } from 'lit-html/directives/if-defined';
 import { styleMap } from 'lit-html/directives/style-map';
@@ -7,11 +7,6 @@ import { Modax } from '../dialog/Modax';
 import { sanitize } from '../textinput/helpers';
 import { CharCount } from '../charcount/CharCount';
 import { CustomEventType } from '../interfaces';
-
-enum SpellCheckerMode {
-  VIEW,
-  EDIT,
-}
 
 interface SpellCheckerResult {
   from: number;
@@ -25,7 +20,16 @@ interface SpellCheckerResultPiece {
   result?: SpellCheckerResult;
 }
 
-type SpellCheckerFunc = (text: string) => Promise<SpellCheckerResult[]>;
+interface FoundTextMatch {
+  start: number;
+  end: number;
+  text: string;
+}
+
+type SpellCheckerFunc = (
+  text: string,
+  lang: string
+) => Promise<SpellCheckerResult[]>;
 
 export class SpellCheckedTextInput extends FormElement {
   static get styles() {
@@ -73,21 +77,9 @@ export class SpellCheckedTextInput extends FormElement {
         background: var(--color-widget-bg-focused);
       }
 
-      .textarea-view {
-        min-height: 30px;
-      }
-
-      textarea,
-      .textarea-view {
-        height: var(--textarea-height);
-      }
-
-      .textinput,
-      .textinput-view {
-        padding: var(--temba-textinput-padding);
+      .textinput {
         border: none;
         flex: 1;
-        margin: 0;
         background: none;
         color: var(--color-widget-text);
         font-family: var(--font-family);
@@ -96,20 +88,33 @@ export class SpellCheckedTextInput extends FormElement {
         cursor: text;
         resize: none;
         font-weight: 300;
-        width: 100%;
+        width: calc(100% - (var(--temba-textinput-padding) * 2));
+        margin: var(--temba-textinput-padding);
+        padding: 0;
+        // make it behave like a normal input
+        display: inline-block;
+        white-space: nowrap;
+        overflow: auto;
       }
 
-      .textinput:focus,
-      .textinput-view:focus {
+      .textinput:focus {
         outline: none;
         box-shadow: none;
         cursor: text;
       }
 
-      .textinput::placeholder,
-      .textinput-view::placeholder {
+      .textinput:empty:before {
+        content: attr(placeholder);
         color: var(--color-placeholder);
         font-weight: 300;
+      }
+
+      .textarea {
+        overflow-wrap: break-word;
+        height: var(--textarea-height);
+        max-height: var(--textarea-height, 30px);
+        min-height: 30px;
+        white-space: unset;
       }
 
       .grow-wrap {
@@ -118,116 +123,21 @@ export class SpellCheckedTextInput extends FormElement {
         width: 100%;
       }
 
-      .spell-correction {
-        position: relative;
+      .grow-wrap .textarea {
+        display: unset;
+        overflow: unset;
+        max-height: unset;
       }
 
-      .spell-correction .text {
+      .spell-correction {
         cursor: text;
         display: inline;
         text-decoration: var(--color-error) wavy underline;
       }
 
-      .spell-correction .tooltip {
-        display: none;
-        flex-direction: column;
-        gap: 8px;
-        position: absolute;
-        bottom: 18px;
-        left: 50%;
-        min-width: 120px;
-        transform: translateX(-50%);
-        cursor: default;
-
-        color: white;
-        padding: 6px;
-        color: var(--color-widget-text);
-        background: var(--color-widget-bg);
-        border: 1px solid var(--color-widget-border);
-        border-radius: var(--curvature-widget);
-        box-shadow: var(--widget-box-shadow);
-        z-index: 100;
-      }
-
-      .spell-correction .right {
-        bottom: unset;
-        left: unset;
-        top: 50%;
-        right: -6px;
-        transform: translateX(100%) translateY(-46%);
-      }
-
-      .spell-correction .left {
-        bottom: unset;
-        left: -6px;
-        top: 50%;
-        transform: translateX(-100%) translateY(-46%);
-      }
-
-      .spell-correction .bottom {
-        bottom: unset;
-        top: 18px;
-      }
-
-      .spell-correction:hover .tooltip {
-        display: flex;
-      }
-
-      .spell-correction .tooltip .tail {
-        position: absolute;
-        bottom: -4px;
-        left: 50%;
-        transform: translateX(-50%) rotate(-45deg);
-        width: 5px;
-        height: 5px;
-        border-left: 1px solid var(--color-widget-border);
-        border-bottom: 1px solid var(--color-widget-border);
-        background: var(--color-widget-bg);
-      }
-
-      .spell-correction .right .tail {
-        bottom: unset;
-        left: -4px;
-        top: 50%;
-        transform: translateY(-50%) rotate(45deg);
-      }
-
-      .spell-correction .left .tail {
-        bottom: unset;
-        left: unset;
-        right: -4px;
-        top: 50%;
-        transform: translateY(-50%) rotate(-135deg);
-      }
-
-      .spell-correction .bottom .tail {
-        bottom: unset;
-        top: -4px;
-        transform: translateX(-50%) rotate(135deg);
-      }
-
-      .spell-correction .tooltip .suggestions {
-        display: flex;
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: 5px;
-      }
-
-      .spell-correction .tooltip .suggestion {
-        cursor: pointer;
-        text-decoration: var(--color-link-primary) underline;
-      }
-
-      .spell-correction .tooltip .suggestion:hover {
-        font-weight: bold;
-      }
-
       .grow-wrap > div {
         border: 0px solid green;
-        width: 100%;
-        padding: var(--temba-textinput-padding);
         flex: 1;
-        margin: 0;
         background: none;
         color: var(--color-widget-text);
         font-family: var(--font-family);
@@ -236,16 +146,100 @@ export class SpellCheckedTextInput extends FormElement {
         cursor: text;
         resize: none;
         font-weight: 300;
-        width: 100%;
-        opacity: 0;
       }
 
-      .grow-wrap textarea,
-      .grow-wrap .textarea-view {
-        margin-left: -100%;
+      /* Hide scrollbar */
+
+      .textinput {
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none; /* Internet Explorer/Edge */
+      }
+
+      .textinput::-webkit-scrollbar {
+        display: none; /* Chrome, Safari */
       }
     `;
   }
+
+  private tooltipCss = css`
+    #spell-checker-tooltip {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: fixed;
+      min-width: 120px;
+      max-width: 200px;
+      cursor: default;
+
+      padding: 6px;
+      color: var(--color-widget-text);
+      background: var(--color-widget-bg);
+      border: 1px solid var(--color-widget-border);
+      border-radius: var(--curvature-widget);
+      box-shadow: var(--widget-box-shadow);
+      z-index: 10000;
+    }
+
+    #spell-checker-tooltip::after {
+      content: '';
+      position: absolute;
+      width: calc(100% + 16px);
+      height: calc(100% + 16px);
+      top: -8px;
+      left: -8px;
+      z-index: -1;
+      opacity: 0;
+    }
+
+    #spell-checker-tooltip .suggestions {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    #spell-checker-tooltip .suggestion {
+      cursor: pointer;
+      text-decoration: var(--color-link-primary) underline;
+    }
+
+    #spell-checker-tooltip .suggestion:hover {
+      font-weight: bold;
+    }
+
+    #spell-checker-tooltip .tail {
+      position: absolute;
+      bottom: -4px;
+      left: 50%;
+      transform: translateX(-50%) rotate(-45deg);
+      width: 5px;
+      height: 5px;
+      border-left: 1px solid var(--color-widget-border);
+      border-bottom: 1px solid var(--color-widget-border);
+      background: var(--color-widget-bg);
+    }
+
+    .right .tail {
+      bottom: unset;
+      left: -4px;
+      top: 50%;
+      transform: translateY(-50%) rotate(45deg);
+    }
+
+    .left .tail {
+      bottom: unset;
+      left: unset;
+      right: -4px;
+      top: 50%;
+      transform: translateY(-50%) rotate(-135deg);
+    }
+
+    .bottom .tail {
+      bottom: unset;
+      top: -4px;
+      transform: translateX(-50%) rotate(135deg);
+    }
+  `;
 
   @property({ type: Boolean })
   textarea: boolean;
@@ -293,13 +287,12 @@ export class SpellCheckedTextInput extends FormElement {
   @state()
   private spellCheckResults: TemplateResult;
 
-  @state()
-  spellCheckerMode = SpellCheckerMode.VIEW;
-
   counterElement: CharCount = null;
   cursorStart = -1;
   cursorEnd = -1;
   spellCheckerFunc: SpellCheckerFunc;
+  inputEventHandlers: any = {};
+  spellCheckerTimeout: any;
 
   public constructor() {
     super();
@@ -310,12 +303,30 @@ export class SpellCheckedTextInput extends FormElement {
         "No 'spellCheckerFunc' of type '(text: string) => Promise<SpellCheckerResult[]>' is found."
       );
     }
+
+    this.inputEventHandlers = {
+      input: this.handleInput.bind(this),
+      blur: this.handleBlur.bind(this),
+      keydown: this.handleKeyDown.bind(this),
+      destroyTooltips: this.destroyTooltips.bind(this),
+      selectionChange: this.onSelectionChange.bind(this),
+      setSelectionRange: this.setSelectionRange.bind(this),
+    };
   }
 
   public firstUpdated(changes: Map<string, any>) {
     super.firstUpdated(changes);
-
     this.inputElement = this.shadowRoot.querySelector('.textinput');
+    this.inputElement.addEventListener('input', this.inputEventHandlers.input);
+    this.inputElement.addEventListener('blur', this.inputEventHandlers.blur);
+    this.inputElement.addEventListener(
+      'keydown',
+      this.inputEventHandlers.keydown
+    );
+    this.inputElement.setSelectionRange =
+      this.inputEventHandlers.setSelectionRange;
+    this.inputElement.value = this.value;
+    this.onSelectionChange();
     this.doSpellCheck();
 
     if (changes.has('counter')) {
@@ -327,7 +338,9 @@ export class SpellCheckedTextInput extends FormElement {
         root = document;
       }
       this.counterElement = root.querySelector(this.counter);
-      this.counterElement.text = this.value;
+      if (this.counterElement) {
+        this.counterElement.text = this.value;
+      }
     }
   }
 
@@ -352,6 +365,9 @@ export class SpellCheckedTextInput extends FormElement {
   }
 
   private updateValue(value: string): void {
+    this.inputElement.value = value;
+    this.onSelectionChange();
+
     const cursorStart = this.inputElement.selectionStart;
     const cursorEnd = this.inputElement.selectionEnd;
 
@@ -364,47 +380,27 @@ export class SpellCheckedTextInput extends FormElement {
 
     this.value = sanitized;
 
-    if (this.textarea) {
-      this.inputElement.value = this.value;
-    }
-
     if (this.counterElement) {
       this.counterElement.text = value;
     }
+
+    this.startSpellCheckTimeout();
   }
 
   private sanitizeGSM(text: string): string {
     return this.gsm ? sanitize(text) : text;
   }
 
-  private handleChange(update: any): void {
-    if (this.disabled) {
-      return;
-    }
-    this.updateValue(update.target.value);
-    this.fireEvent('change');
-  }
-
   private handleContainerClick(): void {
     if (this.disabled) {
       return;
     }
-    this.focusOnInputField();
-  }
-
-  private focusOnInputField() {
-    // Make the input field visible and focus on it
-    this.spellCheckerMode = SpellCheckerMode.EDIT;
-    setTimeout(() => {
-      this.inputElement = this.shadowRoot.querySelector('.textinput');
-      this.inputElement.focus();
-    }, 1);
+    this.inputElement.focus();
+    this.onSelectionChange();
   }
 
   private handleBlur() {
-    // Hide the input field and show the text
-    this.spellCheckerMode = SpellCheckerMode.VIEW;
-    this.doSpellCheck();
+    this.startSpellCheckTimeout(250);
     this.blur();
   }
 
@@ -413,9 +409,182 @@ export class SpellCheckedTextInput extends FormElement {
       return;
     }
 
-    this.updateValue(update.target.value);
+    this.updateValue(update.target.innerText);
     this.setValues([this.value]);
     this.fireEvent('input');
+  }
+
+  private handleKeyDown(e: KeyboardEvent): void {
+    this.onSelectionChange();
+    if (!this.textarea) {
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
+      const input = this;
+
+      if (this.submitOnEnter) {
+        const parentModax = input.getParentModax();
+        const parentForm = !parentModax ? input.getParentForm() : null;
+
+        this.value = this.values[0];
+        this.fireEvent('change');
+
+        // if we don't have something to submit then bail
+        if (!parentModax && !parentForm) {
+          return;
+        }
+
+        input.blur();
+
+        // look for a form to submit
+        window.setTimeout(function () {
+          // first, look for a modax that contains us
+          const modax = input.getParentModax();
+          if (modax) {
+            input.blur();
+
+            modax.submit();
+          } else {
+            // otherwise, just look for a vanilla submit button
+            const form = input.getParentForm();
+
+            if (form) {
+              const submitButton = form.querySelector(
+                "input[type='submit']"
+              ) as HTMLInputElement;
+              if (submitButton) {
+                submitButton.click();
+              } else {
+                form.submit();
+              }
+            }
+          }
+        }, 10);
+        // this is needed for firefox, would be nice to
+        // find a way to do this with a callback instead
+      }
+    }
+  }
+
+  private destroyTooltips() {
+    document.querySelector('#spell-checker-tooltip')?.remove();
+  }
+
+  private onSelectionChange() {
+    const shadowRoot = this.shadowRoot as any;
+    const selection = shadowRoot.getSelection();
+    let offset = 0;
+
+    const findTextInFirstNotBlankSibling = (
+      node: Node,
+      prev = false
+    ): FoundTextMatch => {
+      let selectedNode = node as Element;
+      while (selectedNode) {
+        if (
+          selectedNode.tagName === 'DIV' &&
+          selectedNode.textContent.length > 0
+        ) {
+          selectedNode = (
+            prev ? selectedNode.lastChild : selectedNode.firstChild
+          ) as Element;
+          continue;
+        } else if (
+          selectedNode.nodeType === Node.TEXT_NODE &&
+          selectedNode.textContent.length > 0
+        ) {
+          const start = this.inputElement.innerText.indexOf(
+            selectedNode.textContent
+          );
+          const end = start + selectedNode.textContent.length;
+          return { start, end, text: selectedNode.textContent };
+        }
+        selectedNode = (
+          prev ? selectedNode.previousSibling : selectedNode.nextSibling
+        ) as Element;
+      }
+      return { start: -1, end: -1, text: '' }; // Not found
+    };
+
+    if (selection.focusNode) {
+      const focusedString = selection.focusNode.textContent;
+      const prevMatch = findTextInFirstNotBlankSibling(
+        selection.focusNode.previousSibling,
+        true
+      );
+      const nextMatch = findTextInFirstNotBlankSibling(
+        selection.focusNode.tagName === 'DIV'
+          ? selection.focusNode.firstChild
+          : selection.focusNode.nextSibling
+      );
+
+      offset = this.inputElement.innerText.indexOf(
+        focusedString,
+        prevMatch.end
+      );
+      if (prevMatch.start === -1 && offset && offset === -1) {
+        // can't find the current cursor position so keep it as it is.
+        return;
+      }
+      offset =
+        offset !== -1
+          ? offset
+          : nextMatch.start !== -1
+          ? nextMatch.start - 1
+          : prevMatch.end;
+    }
+
+    const [startOffset, endOffset] = [
+      selection.focusOffset,
+      selection.anchorOffset,
+    ].sort((a, b) => a - b);
+    this.inputElement.selectionStart = offset + startOffset;
+    this.inputElement.selectionEnd = offset + endOffset;
+  }
+
+  private setSelectionRange(startIndex: number, endIndex: number) {
+    const shadowRoot = this.shadowRoot as any;
+    const selection = shadowRoot.getSelection();
+    const range = document.createRange();
+
+    const currentNode = this.inputElement;
+    let charCount = 0;
+
+    function findNode(node: any, index: number, isEnd = false) {
+      for (const child of node.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+          const nextCharCount = charCount + child.length;
+
+          if (index <= nextCharCount) {
+            range[isEnd ? 'setEnd' : 'setStart'](child, index - charCount);
+            return true;
+          }
+
+          charCount = nextCharCount;
+        } else if (child.nodeType === Node.ELEMENT_NODE) {
+          if (child.tagName === 'BR') {
+            if (index == charCount) {
+              range[isEnd ? 'setEnd' : 'setStart'](child, 0);
+              return true;
+            }
+            charCount++;
+          } else if (findNode(child, index, isEnd)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    charCount = 0;
+    findNode(currentNode, startIndex, false); // Set start position
+    charCount = 0;
+    findNode(currentNode, endIndex, true); // Set end position
+
+    selection.removeAllRanges();
+    selection.addRange(range);
   }
 
   /** we just return the value since it should be a string */
@@ -424,7 +593,11 @@ export class SpellCheckedTextInput extends FormElement {
   }
 
   public doSpellCheck(): void {
-    this.spellCheckResults = html`${this.renderText(this.value)}`;
+    if (!this.value) {
+      this.spellCheckResults = undefined;
+      return;
+    }
+
     if (!this.spellCheckerFunc) {
       this.spellCheckResults = html`${[{ text: this.value }].map(
         this.renderSpellCheckResultPiece.bind(this)
@@ -433,7 +606,10 @@ export class SpellCheckedTextInput extends FormElement {
     }
 
     this.checkingSpelling = true;
-    this.spellCheckerFunc(this.value)
+    this.spellCheckResults = html`${this.renderText(this.value)}`;
+    this.renderInputContent();
+
+    this.spellCheckerFunc(this.value, this.lang)
       .then((results: SpellCheckerResult[]) => {
         const pieces: SpellCheckerResultPiece[] = [];
         const resultsLength = results.length;
@@ -460,10 +636,11 @@ export class SpellCheckedTextInput extends FormElement {
             }
             return offset;
           }, 0);
+        this.checkingSpelling = false;
         this.spellCheckResults = html`${pieces.map(
           this.renderSpellCheckResultPiece.bind(this)
         )}`;
-        this.checkingSpelling = false;
+        this.renderInputContent();
         this.fireCustomEvent(CustomEventType.SpellCorrectionsFound, {
           results,
         });
@@ -474,40 +651,122 @@ export class SpellCheckedTextInput extends FormElement {
       });
   }
 
+  private startSpellCheckTimeout(ms = 3000): void {
+    this.onSelectionChange();
+    if (this.spellCheckerTimeout) {
+      clearTimeout(this.spellCheckerTimeout);
+    }
+    this.spellCheckerTimeout = setTimeout(() => {
+      this.doSpellCheck();
+    }, ms);
+  }
+
+  public cancelSpellCheckTimeout(): void {
+    if (this.spellCheckerTimeout) {
+      clearTimeout(this.spellCheckerTimeout);
+    }
+  }
+
+  // @formatter:off
   private renderSpellCheckResultPiece(
-    piece: SpellCheckerResultPiece
+    piece: SpellCheckerResultPiece,
+    index: number
   ): TemplateResult {
     if (!piece.result) {
       return html`${this.renderText(piece.text)}`;
     }
-    return html`
-      <span class="spell-correction">
-        <div class="text">${this.renderText(piece.text)}</div>
-        <div class="tooltip">
-          <div class="message">${piece.result.message}</div>
-          <div class="suggestions">
-            ${piece.result.suggestions.map(
-              suggestion =>
-                html` <div
-                  @click="${evt => {
-                    evt.stopPropagation();
-                    evt.preventDefault();
-                    this.value =
-                      this.value.substring(0, piece.result.from) +
-                      suggestion +
-                      this.value.substring(piece.result.to);
-                    this.doSpellCheck();
-                  }}"
-                  class="suggestion"
-                >
-                  ${suggestion}
-                </div>`
-            )}
-          </div>
-          <div class="tail"></div>
-        </div>
-      </span>
-    `;
+
+    // prettier-ignore
+    return html`<span class="spell-correction" data-index=${index} @click=${e => {e.preventDefault(); e.stopPropagation(); this.handleSpellCorrectionClick.bind(this)(index, piece)}}>${this.renderText(piece.text)}</span>`;
+  }
+  // @formatter:on
+
+  private handleSpellCorrectionClick(
+    index: number,
+    piece: SpellCheckerResultPiece
+  ): void {
+    const target = this.shadowRoot.querySelector(
+      `.spell-correction[data-index="${index}"]`
+    );
+    const tooltip = document.createElement('div');
+    const message = document.createElement('div');
+    const suggestions = document.createElement('div');
+    const tail = document.createElement('div');
+
+    tooltip.id = 'spell-checker-tooltip';
+    message.classList.add('message');
+    message.innerText = piece.result.message;
+    suggestions.classList.add('suggestions');
+    piece.result.suggestions.forEach(suggestion => {
+      const suggestionElement = document.createElement('div');
+      suggestionElement.innerText = suggestion;
+      suggestionElement.classList.add('suggestion');
+      suggestionElement.onclick = () => {
+        const before = this.value.substring(0, piece.result.from);
+        const after = this.value.substring(piece.result.to);
+        this.value = before + suggestion + after;
+        this.inputElement.focus();
+        this.inputElement.setSelectionRange(
+          piece.result.from + suggestion.length,
+          piece.result.from + suggestion.length
+        );
+        this.startSpellCheckTimeout(0);
+      };
+      suggestions.appendChild(suggestionElement);
+    });
+    tail.classList.add('tail');
+
+    tooltip.appendChild(message);
+    tooltip.appendChild(suggestions);
+    tooltip.appendChild(tail);
+
+    // tooltip.style.opacity = '0';
+    if (!document.querySelector('#spell-checker-tooltip-styles')) {
+      const style = document.createElement('style');
+      style.textContent = this.tooltipCss.cssText;
+      style.id = 'spell-checker-tooltip-styles';
+      document.head.appendChild(style);
+    }
+
+    window.addEventListener('click', this.inputEventHandlers.destroyTooltips);
+    document.querySelector('#spell-checker-tooltip')?.remove();
+    document.body.appendChild(tooltip);
+
+    const cr = target.getClientRects()[0];
+    const tr = tooltip.getClientRects()[0];
+    const wr = document.body.getClientRects()[0];
+    if (!cr || !tr) {
+      return;
+    } else if (
+      cr.top > tr.height + 5 &&
+      cr.left + cr.width / 2 > tr.width / 2 + 5
+    ) {
+      const top = cr.top - tr.height - 5;
+      const left = cr.left + cr.width / 2 - tr.width / 2;
+      tooltip.style.top = `${top}px`;
+      tooltip.style.left = `${left}px`;
+    } else if (
+      cr.left + cr.width + tr.width + 10 < wr.width &&
+      cr.top - 10 > tr.height
+    ) {
+      const top = cr.top + cr.height / 2 - tr.height / 2 + 2;
+      const left = cr.left + cr.width + 10;
+      tooltip.style.top = `${top}px`;
+      tooltip.style.left = `${left}px`;
+      tooltip.classList.add('right');
+    } else if (cr.left + 10 > tr.width && cr.top - 10 > tr.height) {
+      const top = cr.top + cr.height / 2 - tr.height / 2 + 2;
+      const left = cr.left - tr.width - 10;
+      tooltip.style.top = `${top}px`;
+      tooltip.style.left = `${left}px`;
+      tooltip.classList.add('left');
+    } else {
+      const top = cr.top + cr.height + 10;
+      const left = cr.left + cr.width / 2 - tr.width / 2;
+      tooltip.style.top = `${top}px`;
+      tooltip.style.left = `${left}px`;
+      tooltip.classList.add('bottom');
+    }
   }
 
   private renderText(text: string): TemplateResult {
@@ -565,30 +824,67 @@ export class SpellCheckedTextInput extends FormElement {
     this.handleContainerClick();
   }
 
-  private renderInputFieldOrDisplayField(input: TemplateResult) {
-    if (this.spellCheckerMode === SpellCheckerMode.VIEW) {
-      input = html`
-        <p class="textinput-view" style="cursor: pointer;">
-          ${this.spellCheckResults}
-        </p>
-      `;
+  public renderInputContent(): void {
+    // Have issue when re-rendering content, using Lit template way,
+    // after it has been changed so have to do this trick to render manually
+    const shadowRoot = this.shadowRoot as any;
+    const parent = this.inputElement.parentElement;
+    const clone = this.inputElement.cloneNode(true) as HTMLInputElement;
+    const focused = shadowRoot.activeElement === this.inputElement;
+    const scrollTop = this.inputElement.scrollTop;
+    const scrollLeft = this.inputElement.scrollLeft;
 
-      if (this.textarea) {
-        input = html`
-          <p class="textinput-view textarea-view" style="cursor: pointer;">
-            ${this.spellCheckResults}
-          </p>
-        `;
+    try {
+      // remove an old input element and add a new one with new rendered content
+      this.inputElement.removeEventListener(
+        'input',
+        this.inputEventHandlers.input
+      );
+      this.inputElement.removeEventListener(
+        'blur',
+        this.inputEventHandlers.blur
+      );
+      this.inputElement.remove();
+      clone.innerHTML = '';
+      clone.selectionStart = Math.min(
+        this.inputElement.selectionStart,
+        this.value.length
+      );
+      clone.selectionEnd = Math.min(
+        this.inputElement.selectionEnd,
+        this.value.length
+      );
 
-        if (this.autogrow) {
-          input = html` <div class="grow-wrap">
-            <div>${this.renderText(this.value)}</div>
-            ${input}
-          </div>`;
-        }
+      clone.setSelectionRange = this.inputEventHandlers.setSelectionRange;
+      render(this.spellCheckResults, clone);
+      parent.appendChild(clone);
+      this.inputElement = clone;
+      this.inputElement.addEventListener(
+        'input',
+        this.inputEventHandlers.input
+      );
+      this.inputElement.addEventListener('blur', this.inputEventHandlers.blur);
+      this.inputElement.addEventListener(
+        'selectionchange',
+        this.inputEventHandlers.selectionChange
+      );
+      this.inputElement.addEventListener(
+        'keydown',
+        this.inputEventHandlers.keydown
+      );
+      this.inputElement.value = this.value;
+      if (focused) {
+        this.inputElement.focus();
+        this.setSelectionRange(
+          this.inputElement.selectionStart,
+          this.inputElement.selectionEnd
+        );
+        this.inputElement.scrollTop = scrollTop;
+        this.inputElement.scrollLeft = scrollLeft;
       }
+    } catch (e) {
+      console.log(e);
     }
-    return input;
   }
 
   public render(): TemplateResult {
@@ -606,91 +902,33 @@ export class SpellCheckedTextInput extends FormElement {
         : null;
 
     let input: TemplateResult<any> = html`
-      <input
+      <div
         class="textinput"
+        contenteditable=${this.disabled ? 'false' : 'true'}
         name=${this.name}
         type="text"
         maxlength="${ifDefined(this.maxlength)}"
-        @change=${this.handleChange}
-        @input=${this.handleInput}
-        @blur=${this.handleBlur}
-        @keydown=${(e: KeyboardEvent) => {
-          if (e.key === 'Enter') {
-            // eslint-disable-next-line @typescript-eslint/no-this-alias
-            const input = this;
-
-            if (this.submitOnEnter) {
-              const parentModax = input.getParentModax();
-              const parentForm = !parentModax ? input.getParentForm() : null;
-
-              this.value = this.values[0];
-              this.fireEvent('change');
-
-              // if we don't have something to submit then bail
-              if (!parentModax && !parentForm) {
-                return false;
-              }
-
-              input.blur();
-
-              // look for a form to submit
-              window.setTimeout(function () {
-                // first, look for a modax that contains us
-                const modax = input.getParentModax();
-                if (modax) {
-                  input.blur();
-
-                  modax.submit();
-                } else {
-                  // otherwise, just look for a vanilla submit button
-                  const form = input.getParentForm();
-
-                  if (form) {
-                    const submitButton = form.querySelector(
-                      "input[type='submit']"
-                    ) as HTMLInputElement;
-                    if (submitButton) {
-                      submitButton.click();
-                    } else {
-                      form.submit();
-                    }
-                  }
-                }
-              }, 10);
-              // this is needed for firefox, would be nice to
-              // find a way to do this with a callback instead
-            }
-          }
-        }}
         placeholder=${this.placeholder}
-        .value=${this.value}
         .disabled=${this.disabled}
-      />
+      ></div>
     `;
 
     if (this.textarea) {
       input = html`
-        <textarea
-          class="textinput"
+        <div
+          class="textinput textarea"
+          contenteditable=${this.disabled ? 'false' : 'true'}
           name=${this.name}
           placeholder=${this.placeholder}
-          @change=${this.handleChange}
-          @input=${this.handleInput}
-          @blur=${this.handleBlur}
-          .value=${this.value}
           .disabled=${this.disabled}
-        ></textarea>
+        ></div>
       `;
 
       if (this.autogrow) {
-        input = html` <div class="grow-wrap">
-          <div>${this.renderText(this.value)}</div>
-          ${input}
-        </div>`;
+        input = html` <div class="grow-wrap">${input}</div>`;
       }
     }
 
-    input = this.renderInputFieldOrDisplayField(input);
     const loading = this.checkingSpelling
       ? html` <div style="position: absolute; right: 10px; bottom: 5px">
           <temba-loading

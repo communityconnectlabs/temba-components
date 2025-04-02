@@ -1,6 +1,6 @@
 {
   "name": "@greatnonprofits-nfp/temba-components",
-  "version": "0.26.4",
+  "version": "0.26.6",
   "description": "Web components to support rapidpro and related projects",
   "author": "Nyaruka <code@nyaruka.com>",
   "main": "dist/index.js",
