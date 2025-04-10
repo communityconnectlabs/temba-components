@@ -365,20 +365,16 @@ export class SpellCheckedTextInput extends FormElement {
   }
 
   private updateValue(value: string): void {
-    this.inputElement.value = value;
+    const sanitized = this.sanitizeGSM(value);
     this.onSelectionChange();
 
-    const cursorStart = this.inputElement.selectionStart;
-    const cursorEnd = this.inputElement.selectionEnd;
-
-    const sanitized = this.sanitizeGSM(value);
-
     if (sanitized !== value) {
-      this.cursorStart = cursorStart;
-      this.cursorEnd = cursorEnd;
+      this.cursorStart = this.inputElement.selectionStart;
+      this.cursorEnd = this.inputElement.selectionEnd;
     }
 
     this.value = sanitized;
+    this.inputElement.value = this.value;
 
     if (this.counterElement) {
       this.counterElement.text = value;
@@ -388,6 +384,10 @@ export class SpellCheckedTextInput extends FormElement {
   }
 
   private sanitizeGSM(text: string): string {
+    if (text) {
+      // Replace the No-Brake Space with Regular Space
+      text = text.replace(/\u00a0/g, ' ');
+    }
     return this.gsm ? sanitize(text) : text;
   }
 
