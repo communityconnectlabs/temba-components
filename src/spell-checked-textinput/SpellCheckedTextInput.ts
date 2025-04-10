@@ -498,7 +498,7 @@ export class SpellCheckedTextInput extends FormElement {
           const start = this.inputElement.innerText.indexOf(
             selectedNode.textContent
           );
-          const end = start + selectedNode.textContent.length;
+          const end = start + selectedNode.textContent.length - 1;
           return { start, end, text: selectedNode.textContent };
         }
         selectedNode = (
@@ -508,7 +508,35 @@ export class SpellCheckedTextInput extends FormElement {
       return { start: -1, end: -1, text: '' }; // Not found
     };
 
+    const calculateOffsetForTheWholeNode = () => {
+      const nodes: Node[] = Array.from(selection.focusNode.childNodes);
+      let offset = 0;
+      for (let i = 0; i < selection.anchorOffset; i++) {
+        const node = nodes[i];
+        if (node.nodeType === Node.TEXT_NODE) {
+          offset += (node as Text).length;
+        } else if (
+          (node as Element).tagName === 'DIV' ||
+          (node as Element).tagName === 'SPAN'
+        ) {
+          offset += (node as any).innerText.length;
+        } else if ((node as Element).tagName === 'BR') {
+          offset++;
+        }
+      }
+      return offset;
+    };
+
     if (selection.focusNode) {
+      if (
+        selection.focusNode.classList?.contains('textinput') &&
+        selection.focusNode.contentEditable
+      ) {
+        const offset = calculateOffsetForTheWholeNode();
+        this.inputElement.selectionStart = offset;
+        this.inputElement.selectionEnd = offset;
+        return;
+      }
       const focusedString = selection.focusNode.textContent;
       const prevMatch = findTextInFirstNotBlankSibling(
         selection.focusNode.previousSibling,
