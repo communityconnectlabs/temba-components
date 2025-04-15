@@ -365,20 +365,16 @@ export class SpellCheckedTextInput extends FormElement {
   }
 
   private updateValue(value: string): void {
-    this.inputElement.value = value;
+    const sanitized = this.sanitizeGSM(value);
     this.onSelectionChange();
 
-    const cursorStart = this.inputElement.selectionStart;
-    const cursorEnd = this.inputElement.selectionEnd;
-
-    const sanitized = this.sanitizeGSM(value);
-
     if (sanitized !== value) {
-      this.cursorStart = cursorStart;
-      this.cursorEnd = cursorEnd;
+      this.cursorStart = this.inputElement.selectionStart;
+      this.cursorEnd = this.inputElement.selectionEnd;
     }
 
     this.value = sanitized;
+    this.inputElement.value = this.value;
 
     if (this.counterElement) {
       this.counterElement.text = value;
@@ -388,6 +384,10 @@ export class SpellCheckedTextInput extends FormElement {
   }
 
   private sanitizeGSM(text: string): string {
+    if (text) {
+      // Replace the No-Brake Space with Regular Space
+      text = text.replace(/\u00a0/g, ' ');
+    }
     return this.gsm ? sanitize(text) : text;
   }
 
@@ -498,7 +498,7 @@ export class SpellCheckedTextInput extends FormElement {
           const start = this.inputElement.innerText.indexOf(
             selectedNode.textContent
           );
-          const end = start + selectedNode.textContent.length;
+          const end = start + selectedNode.textContent.length - 1;
           return { start, end, text: selectedNode.textContent };
         }
         selectedNode = (
@@ -508,7 +508,63 @@ export class SpellCheckedTextInput extends FormElement {
       return { start: -1, end: -1, text: '' }; // Not found
     };
 
+    const calculateOffsetForTheNode = (node, offset) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        offset += (node as Text).length;
+      } else if (
+        (node as Element).tagName === 'DIV' ||
+        (node as Element).tagName === 'SPAN'
+      ) {
+        offset += (node as any).innerText.length;
+      } else if ((node as Element).tagName === 'BR') {
+        offset++;
+      }
+      return offset;
+    };
+
+    const calculateOffsetForTheWholeInputElement = () => {
+      const nodes: Node[] = Array.from(selection.focusNode.childNodes);
+      let offset = 0;
+      for (let i = 0; i < selection.anchorOffset; i++) {
+        const node = nodes[i];
+        offset = calculateOffsetForTheNode(node, offset);
+      }
+      return offset;
+    };
+
+    const calculateOffsetForTheNodeInsideInputElement = () => {
+      const nodes: Node[] = Array.from(this.inputElement.childNodes);
+      let offset = 0;
+      for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
+        if (node === selection.focusNode) {
+          offset++;
+          break;
+        }
+        offset = calculateOffsetForTheNode(node, offset);
+      }
+      return offset;
+    };
+
     if (selection.focusNode) {
+      if (
+        selection.focusNode.classList?.contains('textinput') &&
+        selection.focusNode.contentEditable
+      ) {
+        const offset = calculateOffsetForTheWholeInputElement();
+        this.inputElement.selectionStart = offset;
+        this.inputElement.selectionEnd = offset;
+        return;
+      }
+      if (
+        selection.focusNode.tagName === 'DIV' &&
+        Array.from(this.inputElement.childNodes).includes(selection.focusNode)
+      ) {
+        const offset = calculateOffsetForTheNodeInsideInputElement();
+        this.inputElement.selectionStart = offset;
+        this.inputElement.selectionEnd = offset;
+        return;
+      }
       const focusedString = selection.focusNode.textContent;
       const prevMatch = findTextInFirstNotBlankSibling(
         selection.focusNode.previousSibling,
