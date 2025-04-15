@@ -508,21 +508,40 @@ export class SpellCheckedTextInput extends FormElement {
       return { start: -1, end: -1, text: '' }; // Not found
     };
 
-    const calculateOffsetForTheWholeNode = () => {
+    const calculateOffsetForTheNode = (node, offset) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        offset += (node as Text).length;
+      } else if (
+        (node as Element).tagName === 'DIV' ||
+        (node as Element).tagName === 'SPAN'
+      ) {
+        offset += (node as any).innerText.length;
+      } else if ((node as Element).tagName === 'BR') {
+        offset++;
+      }
+      return offset;
+    };
+
+    const calculateOffsetForTheWholeInputElement = () => {
       const nodes: Node[] = Array.from(selection.focusNode.childNodes);
       let offset = 0;
       for (let i = 0; i < selection.anchorOffset; i++) {
         const node = nodes[i];
-        if (node.nodeType === Node.TEXT_NODE) {
-          offset += (node as Text).length;
-        } else if (
-          (node as Element).tagName === 'DIV' ||
-          (node as Element).tagName === 'SPAN'
-        ) {
-          offset += (node as any).innerText.length;
-        } else if ((node as Element).tagName === 'BR') {
+        offset = calculateOffsetForTheNode(node, offset);
+      }
+      return offset;
+    };
+
+    const calculateOffsetForTheNodeInsideInputElement = () => {
+      const nodes: Node[] = Array.from(this.inputElement.childNodes);
+      let offset = 0;
+      for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
+        if (node === selection.focusNode) {
           offset++;
+          break;
         }
+        offset = calculateOffsetForTheNode(node, offset);
       }
       return offset;
     };
@@ -532,7 +551,16 @@ export class SpellCheckedTextInput extends FormElement {
         selection.focusNode.classList?.contains('textinput') &&
         selection.focusNode.contentEditable
       ) {
-        const offset = calculateOffsetForTheWholeNode();
+        const offset = calculateOffsetForTheWholeInputElement();
+        this.inputElement.selectionStart = offset;
+        this.inputElement.selectionEnd = offset;
+        return;
+      }
+      if (
+        selection.focusNode.tagName === 'DIV' &&
+        Array.from(this.inputElement.childNodes).includes(selection.focusNode)
+      ) {
+        const offset = calculateOffsetForTheNodeInsideInputElement();
         this.inputElement.selectionStart = offset;
         this.inputElement.selectionEnd = offset;
         return;
