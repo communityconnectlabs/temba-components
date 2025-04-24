@@ -644,7 +644,7 @@ export const renderAvatar = (user: User, agent = '') => {
       <div
         class="avatar"
         style="
-          border-radius: 9999px; 
+          border-radius: 9999px;
           display:flex;
           align-items:center;
           border: 2px solid rgba(0,0,0,.05);
@@ -675,7 +675,11 @@ export const renderAttachment = (attachment: string): TemplateResult => {
     style="width:100%;height:300px;border-radius:var(--curvature);box-shadow:0px 0px 10px -1px rgb(160 160 160);overflow:hidden"
   ><embed src="${url}#view=Fit" type="application/pdf" frameBorder="0" scrolling="auto" height="100%" width="100%"></embed></div>`;
   } else if (mediaType === 'video') {
-    return html`<video max-width="400px" height="auto" controls="controls">
+    return html`<video
+      style="border-radius:var(--curvature);box-shadow:0px 0px 12px 0px rgba(0,0,0,.1), 0px 0px 2px 0px rgba(0,0,0,.15);max-width:400px"
+      height="auto"
+      controls
+    >
       <source src="${url}" type="video/mp4" />
     </video> `;
   } else {
