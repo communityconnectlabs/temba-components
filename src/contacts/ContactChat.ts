@@ -197,6 +197,9 @@ export class ContactChat extends RapidElement {
   @property({ type: String })
   agent = '';
 
+  @property({ type: Array })
+  errors: string[];
+
   constructor() {
     super();
     this.showDetails = getCookieBoolean(COOKIE_KEYS.TICKET_SHOW_DETAILS);
@@ -308,13 +311,30 @@ export class ContactChat extends RapidElement {
     }
 
     postJSON(`/api/v2/broadcasts.json`, payload)
-      .then(() => {
-        this.currentChat = '';
-        this.refresh(true);
+      .then(response => {
+        if (response.status < 400) {
+          this.currentChat = '';
+          this.errors = undefined;
+          this.refresh(true);
+        } else {
+          if (
+            response.json.text &&
+            response.json.text.length > 0 &&
+            response.json.text[0].length > 0
+          ) {
+            let textError = response.json.text[0];
+            textError = textError.replace(
+              'Ensure this field has no more than',
+              'Maximum allowed text is'
+            );
+
+            this.errors = [textError];
+          }
+        }
       })
       .catch(err => {
-        // error message dialog?
         console.error(err);
+        this.errors = [err];
       });
   }
 
@@ -363,6 +383,7 @@ export class ContactChat extends RapidElement {
                           <temba-completion
                             @change=${this.handleChatChange}
                             .value=${this.currentChat}
+                            .errors=${this.errors}
                             @keydown=${(e: KeyboardEvent) => {
                               if (e.key === 'Enter' && !e.shiftKey) {
                                 const chat = e.target as Completion;

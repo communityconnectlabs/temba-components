@@ -436,6 +436,10 @@ export const getEventStyles = () => {
     .assigned .attn {
       color: #777;
     }
+
+    .whitespace-pre-wrap {
+      white-space: pre-wrap;
+    }
   `;
 };
 
@@ -704,7 +708,9 @@ export const renderMsgEvent = (
   const isError = event.status === 'E' || event.status === 'F';
   const msg = html`<div style="display:flex;align-items:flex-start">
     <div style="display:flex;flex-direction:column">
-      ${event.msg.text ? html`<div class="msg">${event.msg.text}</div>` : null}
+      ${event.msg.text
+        ? html`<div class="msg whitespace-pre-wrap">${event.msg.text}</div>`
+        : null}
       ${event.msg.attachments
         ? html`<div class="attachments">
             ${event.msg.attachments.map(attachment =>
