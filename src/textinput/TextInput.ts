@@ -502,7 +502,7 @@ export class TextInput extends FormElement {
           class="datepicker hidden"
           altInput
           altFormat="${this.datepicker ? 'F j, Y' : 'F j, Y h:i K'}"
-          dateFormat="${this.datepicker ? 'Y-m-d' : 'Y-m-d H:i'}"
+          dateFormat="${this.datepicker ? 'Y-m-d' : 'Z'}"
           .onValueUpdate=${this.onDateUpdated}
           .onReady=${this.onDateReady}
           ?enableTime=${this.datetimepicker}
