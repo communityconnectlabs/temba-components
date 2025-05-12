@@ -237,13 +237,14 @@ export class TextInput extends FormElement {
 
   private onDateUpdated(dates: Date[], formattedDate: string) {
     if (dates.length > 0) {
-      this.inputElement.value = this.dateElement.formatDate(
-        dates[0],
-        this.dateElement.altFormat
-      );
-
       this.setValue(formattedDate);
       this.inputElement.blur();
+      setTimeout(() => {
+        this.inputElement.value = this.dateElement.formatDate(
+          dates[0],
+          this.dateElement.altFormat
+        );
+      });
     }
   }
 
@@ -500,9 +501,8 @@ export class TextInput extends FormElement {
         />
         <lit-flatpickr
           class="datepicker hidden"
-          altInput
-          altFormat="${this.datepicker ? 'F j, Y' : 'F j, Y h:i K'}"
-          dateFormat="${this.datepicker ? 'Y-m-d' : 'Z'}"
+          altFormat="${this.datetimepicker ? 'F j, Y h:i K' : 'F j, Y'}"
+          dateFormat="${this.datetimepicker ? 'Y-m-d H:i' : 'Y-m-d'}"
           .onValueUpdate=${this.onDateUpdated}
           .onReady=${this.onDateReady}
           ?enableTime=${this.datetimepicker}
