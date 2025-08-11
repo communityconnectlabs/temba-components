@@ -11,6 +11,12 @@ import { fetchContact } from './helpers';
 
 const DEFAULT_REFRESH = 10000;
 
+interface ChatAction {
+  label: string;
+  icon: string;
+  callback: () => undefined;
+}
+
 export class ContactChat extends RapidElement {
   public static get styles() {
     return css`
@@ -199,6 +205,9 @@ export class ContactChat extends RapidElement {
 
   @property({ type: Array })
   errors: string[];
+
+  @property({ type: Array })
+  customActions: ChatAction[];
 
   constructor() {
     super();
@@ -410,6 +419,25 @@ export class ContactChat extends RapidElement {
         </div>
       </div>
 
+      ${this.customActions
+        ? this.customActions.map(
+            action => html`
+              <div class="toolbar">
+                <temba-tip
+                  style="margin-top:5px"
+                  text=${action.label}
+                  position="left"
+                >
+                  <temba-icon
+                    name="${action.icon}"
+                    @click="${action.callback}"
+                    clickable
+                  />
+                </temba-tip>
+              </div>
+            `
+          )
+        : null}
       ${this.toolbar
         ? html`${
             this.currentContact
