@@ -209,6 +209,14 @@ export class ContactChat extends RapidElement {
   @property({ type: Array })
   customActions: ChatAction[];
 
+  @property({ type: String })
+  attachmentAccept?: string;
+
+  @property({ attribute: false })
+  onAttachmentSelected?: () => void;
+
+  private attachmentInput?: HTMLInputElement;
+
   constructor() {
     super();
     this.showDetails = getCookieBoolean(COOKIE_KEYS.TICKET_SHOW_DETAILS);
@@ -282,6 +290,11 @@ export class ContactChat extends RapidElement {
         }
       }
     }
+
+    // get reference on attachment input
+    this.attachmentInput = this.shadowRoot.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement;
   }
 
   private handleChatChange(event: Event) {
@@ -357,6 +370,10 @@ export class ContactChat extends RapidElement {
     setCookie(COOKIE_KEYS.TICKET_SHOW_DETAILS, this.showDetails);
   }
 
+  private selectAttachment() {
+    this.attachmentInput.click();
+  }
+
   public render(): TemplateResult {
     return html`
       <div
@@ -406,12 +423,37 @@ export class ContactChat extends RapidElement {
                             textarea
                           >
                           </temba-completion>
-                          <temba-button
-                            id="send-button"
-                            name="Send"
-                            @click=${this.handleSend}
-                            ?disabled=${this.currentChat.trim().length === 0}
-                          ></temba-button>
+                          <div
+                            style="display: flex; justify-content: space-between; align-items: center;"
+                          >
+                            ${this.onAttachmentSelected &&
+                            html`
+                              <temba-tip
+                                style="margin-top:5px"
+                                text="Send Attachment"
+                                position="left"
+                              >
+                                <temba-icon
+                                  name="paperclip"
+                                  @click="${this.selectAttachment}"
+                                  clickable
+                                ></temba-icon>
+                                <input
+                                  type="file"
+                                  aria-hidden="true"
+                                  style="display: none"
+                                  accept="${this.attachmentAccept}"
+                                  @change="${this.onAttachmentSelected}"
+                                />
+                              </temba-tip>
+                            `}
+                            <temba-button
+                              id="send-button"
+                              name="Send"
+                              @click=${this.handleSend}
+                              ?disabled=${this.currentChat.trim().length === 0}
+                            ></temba-button>
+                          </div>
                         </div>`
                   }
                   </div>`
