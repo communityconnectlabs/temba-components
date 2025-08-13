@@ -450,6 +450,7 @@ export class ContactChat extends RapidElement {
                             <temba-button
                               id="send-button"
                               name="Send"
+                              style="margin-left: auto"
                               @click=${this.handleSend}
                               ?disabled=${this.currentChat.trim().length === 0}
                             ></temba-button>
