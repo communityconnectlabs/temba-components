@@ -6,7 +6,8 @@ import { ContactField, Ticket } from '../interfaces';
 
 export type Asset = KeyedAsset & Ticket & ContactField;
 
-export const DATE_FORMAT = /(\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+([+-][0-2]\d:[0-5]\d|Z))|(\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d([+-][0-2]\d:[0-5]\d|Z))|(\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d([+-][0-2]\d:[0-5]\d|Z))/;
+export const DATE_FORMAT =
+  /(\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+([+-][0-2]\d:[0-5]\d|Z))|(\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d([+-][0-2]\d:[0-5]\d|Z))|(\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d([+-][0-2]\d:[0-5]\d|Z))/;
 
 interface KeyedAsset {
   key?: string;
@@ -260,12 +261,11 @@ export const postForm = (
 
 /**
  */
-export const renderIf = (predicate: boolean | any) => (
-  then: () => TemplateResult,
-  otherwise?: () => TemplateResult
-) => {
-  return predicate ? then() : otherwise ? otherwise() : html``;
-};
+export const renderIf =
+  (predicate: boolean | any) =>
+  (then: () => TemplateResult, otherwise?: () => TemplateResult) => {
+    return predicate ? then() : otherwise ? otherwise() : html``;
+  };
 
 export const hexToRgb = (hex: string): { r: number; g: number; b: number } => {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -415,6 +415,18 @@ export class Stubbable {
 }
 
 export const stubbable = new Stubbable();
+
+export const formatDateTime = (date: string) => {
+  return new Date(date).toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
+};
 
 export const timeSince = (
   date: Date,

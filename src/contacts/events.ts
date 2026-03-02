@@ -1,6 +1,13 @@
 import { css, html, TemplateResult } from 'lit';
 import { Msg, ObjectReference, User } from '../interfaces';
-import { getClasses, oxford, oxfordFn, oxfordNamed, timeSince } from '../utils';
+import {
+  formatDateTime,
+  getClasses,
+  oxford,
+  oxfordFn,
+  oxfordNamed,
+  timeSince,
+} from '../utils';
 import { getDisplayName } from './helpers';
 
 export const getEventStyles = () => {
@@ -748,7 +755,7 @@ export const renderMsgEvent = (
               <div class="recipients">${event.recipient_count} contacts</div>
               <div class="separator">•</div>`
           : null}
-        <div class="time">${timeSince(new Date(event.created_on))}</div>
+        <div class="time">${formatDateTime(event.created_on)}</div>
       </div>
     </div>
 
@@ -890,7 +897,7 @@ export const renderNoteCreated = (
       <div class="description">${event.note}</div>
       <div class="note-summary">
         <div style="flex-grow:1"></div>
-        <div class="time">${timeSince(new Date(event.created_on))}</div>
+        <div class="time">${formatDateTime(event.created_on)}</div>
       </div>
     </div>
     <div style="margin-left:0.8em;margin-top:0.3em;font-size:0.8em">
