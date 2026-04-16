@@ -98,9 +98,8 @@ describe('temba-dialog', () => {
     const dialog: Dialog = await fixture(getDialogHTML(true));
     await open(dialog);
 
-    const mask: HTMLDivElement = dialog.shadowRoot.querySelector(
-      '#dialog-mask'
-    );
+    const mask: HTMLDivElement =
+      dialog.shadowRoot.querySelector('#dialog-mask');
     mask.click();
 
     await dialog.updateComplete;

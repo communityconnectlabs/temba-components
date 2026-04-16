@@ -272,9 +272,8 @@ export class TembaList extends RapidElement {
             window.setTimeout(() => {
               const options = this.shadowRoot.querySelector('temba-options');
               if (options) {
-                const option = options.shadowRoot.querySelector(
-                  '.option.focused'
-                );
+                const option =
+                  options.shadowRoot.querySelector('.option.focused');
                 option.scrollIntoView({ block: 'end', inline: 'nearest' });
               }
             }, 0);
