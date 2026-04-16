@@ -640,9 +640,8 @@ export class ContactHistory extends RapidElement {
   private handleEventGroupShow(event: MouseEvent) {
     const grouping = event.currentTarget as HTMLDivElement;
     const groupIndex = parseInt(grouping.getAttribute('data-group-index'));
-    const eventGroup = this.eventGroups[
-      this.eventGroups.length - groupIndex - 1
-    ];
+    const eventGroup =
+      this.eventGroups[this.eventGroups.length - groupIndex - 1];
     eventGroup.open = true;
     this.requestUpdate('eventGroups');
   }
@@ -653,9 +652,8 @@ export class ContactHistory extends RapidElement {
 
     const grouping = event.currentTarget as HTMLDivElement;
     const groupIndex = parseInt(grouping.getAttribute('data-group-index'));
-    const eventGroup = this.eventGroups[
-      this.eventGroups.length - groupIndex - 1
-    ];
+    const eventGroup =
+      this.eventGroups[this.eventGroups.length - groupIndex - 1];
 
     eventGroup.open = false;
 

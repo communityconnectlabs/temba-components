@@ -463,23 +463,21 @@ export class ContactChat extends RapidElement {
       </div>
 
       ${this.customActions
-        ? this.customActions.map(
-            action => html`
-              <div class="toolbar">
-                <temba-tip
-                  style="margin-top:5px"
-                  text=${action.label}
-                  position="left"
-                >
-                  <temba-icon
-                    name="${action.icon}"
-                    @click="${action.callback}"
-                    clickable
-                  />
-                </temba-tip>
-              </div>
-            `
-          )
+        ? html` <div class="toolbar">
+            ${this.customActions.map(
+              action => html` <temba-tip
+                style="margin-top:5px"
+                text=${action.label}
+                position="left"
+              >
+                <temba-icon
+                  name="${action.icon}"
+                  @click="${action.callback}"
+                  clickable
+                />
+              </temba-tip>`
+            )}
+          </div>`
         : null}
       ${this.toolbar
         ? html`${
